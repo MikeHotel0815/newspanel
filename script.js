@@ -27,8 +27,9 @@ function createYouTubePlayer(playerId, videoId, wrapperId) {
         },
         events: {
             'onReady': (event) => {
-                // Player is ready. Ensure it's muted.
+                // Player is ready. Ensure it's muted and try to play.
                 event.target.mute();
+                event.target.playVideo(); // Explicitly call playVideo
                 // Store the player instance
                 playerInstances[playerId] = { type: 'youtube', player: event.target, wrapperId: wrapperId };
                 // Initial update of audio frame might be needed if it should be active
