@@ -4,7 +4,8 @@ const LS_GLOBAL_SETTINGS_KEY = 'hlsAppGlobalSettings';
 const LS_GRID_LAYOUT_KEY = 'hlsAppGridLayout'; // New key for grid layout
 
 let globalSettings = {
-    enableSubtitles: false
+    enableSubtitles: false,
+    backgroundColor: '#000000' // Default background color
 };
 
 let youtubeApiReady = false;
@@ -171,6 +172,17 @@ function applyGridLayout(orderedStreamIds) {
     updateGridLayout(); // Ensure grid is updated after applying layout
 }
 
+// --- Background Color Application ---
+function applyBackgroundColor(color) {
+    if (color) {
+        document.body.style.backgroundColor = color;
+        console.log("Background color applied:", color);
+    } else {
+        // Fallback or default if color is somehow invalid/undefined
+        document.body.style.backgroundColor = globalSettings.backgroundColor; // Re-apply default from settings
+        console.warn("applyBackgroundColor called with invalid color, applied default from settings.");
+    }
+}
 
 // --- YouTube API Specific ---
 function onYouTubeIframeAPIReady() {
@@ -601,6 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
     streamForm = document.getElementById('stream-form');
     cancelEditBtn = document.getElementById('cancel-edit-btn');
     const mainElement = document.querySelector('main'); // Get reference to main element
+    const backgroundColorPicker = document.getElementById('global-background-color'); // Get color picker element
 
     populateStreamDropdown();
 
@@ -610,6 +623,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Ensure grid layout is updated after initial load (applyGridLayout also calls it, but good to have it here too for clarity)
     updateGridLayout();
+
+    // Apply initial background color
+    applyBackgroundColor(globalSettings.backgroundColor);
+    if (backgroundColorPicker) {
+        backgroundColorPicker.value = globalSettings.backgroundColor;
+    }
+
 
     // --- Dynamic Padding Adjustment for Header ---
     const PADDING_WHEN_HEADER_VISIBLE = '100px'; // Corresponds to main padding-top in CSS
@@ -879,5 +899,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     } else {
         console.error("videoGridContainer not found, drag and drop for videos will not work.");
+    }
+
+    // Event listener for background color picker
+    if (backgroundColorPicker) {
+        backgroundColorPicker.addEventListener('input', (event) => { // 'input' for live preview, 'change' for on release
+            const newColor = event.target.value;
+            globalSettings.backgroundColor = newColor;
+            applyBackgroundColor(newColor);
+            saveGlobalSettings();
+        });
+    } else {
+        console.warn("#global-background-color input not found.");
     }
 });

@@ -1,8 +1,8 @@
 body {
     font-family: sans-serif;
     margin: 0;
-    background-color: #f4f4f4;
-    color: #333;
+    background-color: #000000; /* Default background to black */
+    color: #ccc; /* Default text color to light gray for better contrast on black */
     display: flex;
     flex-direction: column;
     min-height: 100vh;
@@ -145,6 +145,7 @@ main {
 
 .modal-content {
     background-color: #fefefe;
+    color: #333; /* Ensure text in modal is dark against light background */
     margin: 5% auto; /* 5% from the top and centered */
     padding: 20px;
     border: 1px solid #888;
