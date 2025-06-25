@@ -600,6 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
     globalEnableSubtitlesCheckbox = document.getElementById('global-enable-subtitles');
     streamForm = document.getElementById('stream-form');
     cancelEditBtn = document.getElementById('cancel-edit-btn');
+    const mainElement = document.querySelector('main'); // Get reference to main element
 
     populateStreamDropdown();
 
@@ -609,6 +610,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Ensure grid layout is updated after initial load (applyGridLayout also calls it, but good to have it here too for clarity)
     updateGridLayout();
+
+    // --- Dynamic Padding Adjustment for Header ---
+    const PADDING_WHEN_HEADER_VISIBLE = '100px'; // Corresponds to main padding-top in CSS
+    const PADDING_WHEN_HEADER_HIDDEN = '1rem';   // Or '0px' or a smaller padding
+
+    function adjustMainContentPadding(isHeaderVisible) {
+        if (!mainElement) return;
+        if (isHeaderVisible) {
+            mainElement.style.paddingTop = PADDING_WHEN_HEADER_VISIBLE;
+        } else {
+            mainElement.style.paddingTop = PADDING_WHEN_HEADER_HIDDEN;
+        }
+        // It might be necessary to call updateGridLayout() if player sizes depend on main's effective height
+        // updateGridLayout();
+    }
+
+    if (header && mainElement) {
+        // Initial adjustment based on header's default state (hidden)
+        adjustMainContentPadding(header.classList.contains('header-visible'));
+
+        const observer = new MutationObserver((mutationsList) => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    const isVisible = header.classList.contains('header-visible');
+                    adjustMainContentPadding(isVisible);
+                }
+            }
+        });
+        observer.observe(header, { attributes: true });
+    } else {
+        console.warn("Header or Main element not found for dynamic padding adjustment.");
+    }
+
+    // --- End Dynamic Padding Adjustment ---
 
     streamSelect.addEventListener('change', (event) => {
         const selectedOptionIndex = event.target.value;

@@ -83,10 +83,11 @@ header h1 {
 main {
     flex-grow: 1;
     padding: 1rem;
-    padding-top: 100px; /* Approximate header height, adjust if necessary */
+    padding-top: 100px; /* This will be the default when JS is disabled or before it runs. JS will override. */
     display: flex; /* Allow video-grid-container to flex-grow */
     flex-direction: column; /* Stack children vertically */
     overflow: hidden; /* Prevent scrollbars on main if grid fits perfectly */
+    transition: padding-top 0.3s ease; /* Smooth transition for padding change */
 }
 
 #video-grid-container {
