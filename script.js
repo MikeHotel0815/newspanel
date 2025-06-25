@@ -106,9 +106,21 @@ document.addEventListener('DOMContentLoaded', () => {
         videoWrapper.appendChild(removeBtn);
         videoGridContainer.appendChild(videoWrapper);
 
-        // Click listener for fullscreen and unmute
-        videoWrapper.addEventListener('click', () => {
-            toggleFullscreenAndSound(videoElement, playerInstanceId);
+        // Event listeners for the wrapper
+        videoWrapper.addEventListener('click', (event) => {
+            // Prevent click from triggering when the remove button is clicked
+            if (event.target === removeBtn) {
+                return;
+            }
+            handleVideoWrapperClick(videoElement, playerInstanceId);
+        });
+
+        videoWrapper.addEventListener('dblclick', (event) => {
+            // Prevent dblclick from triggering when the remove button is dblclicked
+            if (event.target === removeBtn) {
+                return;
+            }
+            handleVideoWrapperDblClick(videoElement);
         });
 
         updateGridLayout();
@@ -117,6 +129,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function removeStreamFromGrid(playerInstanceId) {
         const videoWrapper = document.getElementById(playerInstanceId);
         if (videoWrapper) {
+            // TODO: Properly remove event listeners from videoWrapper and videoElement if added directly
+            // For now, listeners are on wrapper, and it's removed, which is okay.
             videoGridContainer.removeChild(videoWrapper);
         }
         if (hlsInstances[playerInstanceId]) {
@@ -126,20 +140,28 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGridLayout();
     }
 
-    function toggleFullscreenAndSound(videoElement, activePlayerId) {
-        // Unmute active video, mute others
-        document.querySelectorAll('#video-grid-container video').forEach(vid => {
-            const parentWrapper = vid.closest('.video-player-wrapper');
-            if (parentWrapper && parentWrapper.id === activePlayerId) {
-                vid.muted = false;
-            } else {
-                vid.muted = true;
-            }
-        });
+    function getCurrentFullscreenElement() {
+        return document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+    }
 
-        // Handle fullscreen
-        if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
-            // Enter fullscreen
+    function handleVideoWrapperClick(videoElement, activePlayerId) {
+        const currentFullscreenElement = getCurrentFullscreenElement();
+
+        if (currentFullscreenElement === videoElement) {
+            // Video is already in fullscreen: toggle sound
+            videoElement.muted = !videoElement.muted;
+        } else if (!currentFullscreenElement) {
+            // No video is in fullscreen: enter fullscreen for this video
+            // Unmute this video, mute others
+            document.querySelectorAll('#video-grid-container video').forEach(vid => {
+                const parentWrapper = vid.closest('.video-player-wrapper');
+                if (parentWrapper && parentWrapper.id === activePlayerId) {
+                    vid.muted = false;
+                } else {
+                    vid.muted = true;
+                }
+            });
+
             if (videoElement.requestFullscreen) {
                 videoElement.requestFullscreen();
             } else if (videoElement.mozRequestFullScreen) { /* Firefox */
@@ -149,21 +171,31 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (videoElement.msRequestFullscreen) { /* IE/Edge */
                 videoElement.msRequestFullscreen();
             }
-        } else {
-            // Exit fullscreen (if the clicked element is already fullscreen)
-            // Note: Exiting fullscreen is usually handled by the browser (e.g., 'Esc' key)
-            // If we want to programmatically exit if *any* video is fullscreen:
-            if (document.exitFullscreen) {
-                // document.exitFullscreen(); // This would exit if *any* element is fullscreen.
-                                         // We might want to only exit if THIS video is fullscreen.
-                                         // However, browser typically handles 'Esc' for this.
-            }
-            // After exiting fullscreen (e.g. by pressing ESC), all videos should be muted again by default.
-            // The 'fullscreenchange' event is better for this.
         }
+        // If another video is in fullscreen, a simple click does nothing on a non-fullscreen video.
+        // User must exit fullscreen first or double click the fullscreen video.
     }
 
-    // Mute all videos when exiting fullscreen mode
+    function handleVideoWrapperDblClick(videoElement) {
+        const currentFullscreenElement = getCurrentFullscreenElement();
+        if (currentFullscreenElement === videoElement) {
+            // If this video is in fullscreen, exit fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.mozCancelFullScreen) { /* Firefox */
+                document.mozCancelFullScreen();
+            } else if (document.webkitExitFullscreen) { /* Chrome, Safari & Opera */
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) { /* IE/Edge */
+                document.msExitFullscreen();
+            }
+        }
+        // If no video is fullscreen, or a different video is fullscreen, dblclick does nothing special yet.
+        // Could be extended to enter fullscreen on dblclick if not already in it.
+        // For now, it only handles exiting its own fullscreen.
+    }
+
+    // Mute all videos when exiting fullscreen mode (globally, via Esc or dblclick)
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
