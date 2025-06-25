@@ -239,6 +239,27 @@ main {
     background-color: #545b62;
 }
 
+/* Global Settings in Modal */
+#global-settings-container {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+#global-settings-container div {
+    margin-bottom: 10px;
+}
+
+#global-settings-container label {
+    display: inline-block; /* Align checkbox and label nicely */
+    margin-right: 10px;
+    font-weight: normal; /* Override form label bold if not desired */
+}
+
+#global-settings-container input[type="checkbox"] {
+    vertical-align: middle;
+}
+
 .video-player-wrapper video {
     display: block;
     width: 100%;
