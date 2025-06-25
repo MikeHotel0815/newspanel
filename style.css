@@ -8,12 +8,43 @@ body {
     min-height: 100vh;
 }
 
+/* Header Trigger Zone Styling */
+#header-trigger-zone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 30px; /* Adjust as needed */
+    z-index: 1000; /* High, but below the actual header when it's visible */
+    /* background-color: rgba(255, 0, 0, 0.1); */ /* For debugging */
+}
+
 header {
     background-color: #333;
     color: #fff;
     padding: 1rem;
     text-align: center;
+    position: fixed; /* Make header fixed */
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1001; /* Above the trigger zone and content when visible */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-100%);
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s linear 0.3s;
 }
+
+header.header-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0%);
+    pointer-events: auto;
+    /* Override transition for visibility to be immediate when becoming visible */
+    transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s linear 0s;
+}
+
 
 header h1 {
     margin: 0;

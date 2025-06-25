@@ -378,4 +378,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateGridLayout();
     window.addEventListener('resize', updateGridLayout);
+
+    // Header visibility logic
+    const header = document.querySelector('header');
+    const headerTriggerZone = document.getElementById('header-trigger-zone');
+    let headerVisibilityTimer = null;
+    const HEADER_VISIBILITY_DELAY = 100; // ms
+
+    if (header && headerTriggerZone) {
+        headerTriggerZone.addEventListener('mouseenter', () => {
+            clearTimeout(headerVisibilityTimer);
+            headerVisibilityTimer = setTimeout(() => {
+                header.classList.add('header-visible');
+            }, HEADER_VISIBILITY_DELAY);
+        });
+
+        headerTriggerZone.addEventListener('mousemove', () => {
+            clearTimeout(headerVisibilityTimer);
+            headerVisibilityTimer = setTimeout(() => {
+                header.classList.add('header-visible');
+            }, HEADER_VISIBILITY_DELAY);
+        });
+
+        headerTriggerZone.addEventListener('mouseleave', () => {
+            clearTimeout(headerVisibilityTimer);
+            // If mouse leaves trigger zone but header is already visible (timer fired),
+            // it should only hide if mouse also leaves the header itself.
+            // This is handled by header's own mouseleave.
+        });
+
+        header.addEventListener('mouseleave', () => {
+            clearTimeout(headerVisibilityTimer); // Clear timer if mouse quickly enters and leaves header
+            header.classList.remove('header-visible');
+        });
+    }
 });
