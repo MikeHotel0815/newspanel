@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (event.target === removeBtn) {
                 return;
             }
-            handleVideoWrapperDblClick(videoElement);
+            handleVideoWrapperDblClick(event, videoElement, playerInstanceId); // Pass event and playerInstanceId
         });
 
         updateGridLayout();
@@ -151,16 +151,50 @@ document.addEventListener('DOMContentLoaded', () => {
             event.preventDefault(); // Prevent browser's default click action on video
             videoElement.muted = !videoElement.muted;
         } else if (!currentFullscreenElement) {
-            // No video is in fullscreen: enter fullscreen for this video
-            // Unmute this video, mute others
-            // event.preventDefault() might be needed here too if clicking the wrapper around a video
-            // that is not yet fullscreen also triggers some unwanted default action. For now, assume not.
-            document.querySelectorAll('#video-grid-container video').forEach(vid => {
-                const parentWrapper = vid.closest('.video-player-wrapper');
+            // No video is in fullscreen (i.e., click in grid view):
+            // Only toggle sound for the clicked stream, mute others. Do not enter fullscreen.
+            event.preventDefault(); // Good practice to prevent any default action.
+            document.querySelectorAll('#video-grid-container video').forEach(vid_iter => {
+                const parentWrapper = vid_iter.closest('.video-player-wrapper');
                 if (parentWrapper && parentWrapper.id === activePlayerId) {
-                    vid.muted = false;
+                    vid_iter.muted = false; // Unmute clicked one
                 } else {
-                    vid.muted = true;
+                    vid_iter.muted = true;  // Mute others
+                }
+            });
+            // Fullscreen logic removed from here for single click in grid
+        }
+        // If another video is in fullscreen, a simple click on a non-fullscreen grid video does nothing to that grid video's sound or fullscreen state.
+        // This part of the logic might need refinement if a click on a grid item should always try to control its sound,
+        // even if another item is fullscreen. For now, it's scoped to only act if no item is fullscreen, or if the clicked item IS fullscreen.
+    }
+
+    function handleVideoWrapperDblClick(event, videoElement, activePlayerId) { // Added event and activePlayerId
+        const currentFullscreenElement = getCurrentFullscreenElement();
+
+        if (currentFullscreenElement === videoElement) {
+            // Video is already in fullscreen: exit fullscreen
+            event.preventDefault(); // Good practice
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.mozCancelFullScreen) { /* Firefox */
+                document.mozCancelFullScreen();
+            } else if (document.webkitExitFullscreen) { /* Chrome, Safari & Opera */
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) { /* IE/Edge */
+                document.msExitFullscreen();
+            }
+        } else if (!currentFullscreenElement) {
+            // No video is in fullscreen (i.e., dblclick in grid view):
+            // Unmute this video, mute others, and enter fullscreen for this video.
+            event.preventDefault();
+
+            document.querySelectorAll('#video-grid-container video').forEach(vid_iter => {
+                const parentWrapper = vid_iter.closest('.video-player-wrapper');
+                if (parentWrapper && parentWrapper.id === activePlayerId) {
+                    vid_iter.muted = false; // Unmute clicked one
+                } else {
+                    vid_iter.muted = true;  // Mute others
                 }
             });
 
@@ -174,27 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 videoElement.msRequestFullscreen();
             }
         }
-        // If another video is in fullscreen, a simple click does nothing on a non-fullscreen video.
-        // User must exit fullscreen first or double click the fullscreen video.
-    }
-
-    function handleVideoWrapperDblClick(videoElement) {
-        const currentFullscreenElement = getCurrentFullscreenElement();
-        if (currentFullscreenElement === videoElement) {
-            // If this video is in fullscreen, exit fullscreen
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.mozCancelFullScreen) { /* Firefox */
-                document.mozCancelFullScreen();
-            } else if (document.webkitExitFullscreen) { /* Chrome, Safari & Opera */
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) { /* IE/Edge */
-                document.msExitFullscreen();
-            }
-        }
-        // If no video is fullscreen, or a different video is fullscreen, dblclick does nothing special yet.
-        // Could be extended to enter fullscreen on dblclick if not already in it.
-        // For now, it only handles exiting its own fullscreen.
+        // If another video is fullscreen, a dblclick on a non-fullscreen grid item currently does nothing.
     }
 
     // Mute all videos when exiting fullscreen mode (globally, via Esc or dblclick)
