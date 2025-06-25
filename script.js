@@ -580,12 +580,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', updateGridLayout);
 
     // Header visibility logic
-    const header = document.querySelector('header');
+    const header = document.querySelector('header'); // Already declared globally for header hide/show
     const headerTriggerZone = document.getElementById('header-trigger-zone');
     let headerVisibilityTimer = null;
     const HEADER_VISIBILITY_DELAY = 100; // ms
 
-    if (header && headerTriggerZone) {
+    if (header && headerTriggerZone) { // header is now global, check if it's found
         headerTriggerZone.addEventListener('mouseenter', () => {
             clearTimeout(headerVisibilityTimer);
             headerVisibilityTimer = setTimeout(() => {
@@ -609,4 +609,205 @@ document.addEventListener('DOMContentLoaded', () => {
             header.classList.remove('header-visible');
         });
     }
+
+    // Stream Manager Modal Logic
+    const manageStreamsBtn = document.getElementById('manage-streams-btn');
+    const streamManagerModal = document.getElementById('stream-manager-modal');
+    const modalStreamListContainer = document.getElementById('modal-stream-list-container');
+    const modalCloseBtn = streamManagerModal ? streamManagerModal.querySelector('.modal-close-btn') : null;
+
+    function renderStreamManagementList() {
+        if (!modalStreamListContainer) return;
+        modalStreamListContainer.innerHTML = ''; // Clear existing list
+
+        if (streams.length === 0) {
+            modalStreamListContainer.innerHTML = '<p>Keine Streams konfiguriert.</p>';
+            return;
+        }
+
+        streams.forEach((stream, index) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.classList.add('stream-item');
+            itemDiv.dataset.streamId = stream.id; // Store ID for actions
+
+            const detailsDiv = document.createElement('div');
+            detailsDiv.classList.add('stream-details');
+            detailsDiv.innerHTML = `
+                <strong>${stream.name}</strong><br>
+                <small>${stream.url} (${stream.type})</small>
+            `;
+
+            const actionsDiv = document.createElement('div');
+            actionsDiv.classList.add('stream-actions');
+
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Edit';
+            editBtn.classList.add('edit-stream-btn');
+            editBtn.dataset.index = index; // Or use stream.id to find later
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.classList.add('delete-stream-btn');
+            deleteBtn.dataset.index = index;
+
+            const defaultLabel = document.createElement('label');
+            defaultLabel.style.marginLeft = '10px';
+            const defaultCheckbox = document.createElement('input');
+            defaultCheckbox.type = 'checkbox';
+            defaultCheckbox.checked = stream.isDefault;
+            defaultCheckbox.classList.add('default-stream-checkbox');
+            defaultCheckbox.dataset.streamId = stream.id;
+            defaultLabel.appendChild(defaultCheckbox);
+            defaultLabel.append(' Default');
+
+            actionsDiv.appendChild(editBtn);
+            actionsDiv.appendChild(deleteBtn);
+            actionsDiv.appendChild(defaultLabel);
+
+            itemDiv.appendChild(detailsDiv);
+            itemDiv.appendChild(actionsDiv);
+            modalStreamListContainer.appendChild(itemDiv);
+        });
+    }
+
+
+    if (manageStreamsBtn && streamManagerModal && modalCloseBtn && modalStreamListContainer) {
+        manageStreamsBtn.addEventListener('click', () => {
+            renderStreamManagementList();
+            // Reset form to "add mode" when opening modal
+            document.getElementById('stream-form').reset();
+            document.getElementById('stream-edit-id').value = '';
+            document.querySelector('#stream-edit-form-container h3').textContent = 'Stream hinzufügen';
+            document.getElementById('save-stream-btn').textContent = 'Hinzufügen';
+            document.getElementById('cancel-edit-btn').style.display = 'none';
+            streamManagerModal.classList.add('modal-open');
+        });
+
+        modalCloseBtn.addEventListener('click', () => {
+            streamManagerModal.classList.remove('modal-open');
+        });
+
+        streamManagerModal.addEventListener('click', (event) => {
+            if (event.target === streamManagerModal) {
+                streamManagerModal.classList.remove('modal-open');
+            }
+        });
+
+        // Event Delegation for delete buttons
+        modalStreamListContainer.addEventListener('click', (event) => {
+            if (event.target.classList.contains('delete-stream-btn')) {
+                const streamIndex = parseInt(event.target.dataset.index, 10);
+                if (!isNaN(streamIndex) && confirm(`Stream "${streams[streamIndex].name}" wirklich löschen?`)) {
+                    // Before deleting from config, check if it's playing and remove from grid
+                    const streamToDelete = streams[streamIndex];
+                    for (const playerId in playerInstances) {
+                        const instance = playerInstances[playerId];
+                        let urlToCheck = '';
+                        if (instance.type === 'hls') {
+                            urlToCheck = instance.media.src; // or hls.url if that's more direct
+                        } else if (instance.type === 'youtube') {
+                            // Getting URL from YT player is tricky. Compare by ID if possible or name.
+                            // For now, we assume if a stream config is deleted, its active player should be removed.
+                            // This part needs a robust way to link config stream to active player.
+                            // Using stream.id to find the playerInstance could be an option if playerInstanceId is derived from stream.id
+                        }
+                        // This is a simplified check. A robust link would be playerInstance.configStreamId === streamToDelete.id
+                        // For now, if we delete a stream, we don't automatically remove its player from the grid via this button.
+                        // That should be handled by a "remove from grid" action on the grid player itself.
+                        // This button only removes from configuration.
+                    }
+
+                    deleteStream(streamIndex); // Deletes from 'streams' array and localStorage
+                    renderStreamManagementList(); // Re-render the list in the modal
+                    // populateStreamDropdown(); // Already called by deleteStream
+                }
+            } else if (event.target.classList.contains('default-stream-checkbox')) {
+                const streamId = event.target.dataset.streamId;
+                const isChecked = event.target.checked;
+                setStreamDefaultStatus(streamId, isChecked);
+                // Optional: Visuelles Feedback, aber die Checkbox selbst ist das Feedback.
+                // Die Liste muss nicht neu gerendert werden, da sich nur der interne Status ändert.
+                // Die Änderung wird beim nächsten Laden der Seite wirksam.
+            } else if (event.target.classList.contains('edit-stream-btn')) {
+                const streamIndex = parseInt(event.target.dataset.index, 10);
+                const streamToEdit = streams[streamIndex];
+                if (streamToEdit) {
+                    document.getElementById('stream-edit-form-container').querySelector('h3').textContent = 'Stream bearbeiten';
+                    document.getElementById('stream-edit-id').value = streamToEdit.id; // Store ID, not index, for robustness
+                    document.getElementById('stream-name').value = streamToEdit.name;
+                    document.getElementById('stream-url').value = streamToEdit.url;
+                    document.getElementById('stream-type').value = streamToEdit.type;
+                    document.getElementById('stream-is-default').checked = streamToEdit.isDefault;
+                    document.getElementById('save-stream-btn').textContent = 'Änderungen speichern';
+                    document.getElementById('cancel-edit-btn').style.display = 'inline-block';
+                    // Scroll to form or ensure it's visible might be good UX
+                    document.getElementById('stream-name').focus();
+                }
+            }
+        });
+
+        const streamForm = document.getElementById('stream-form');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+
+        if (streamForm && cancelEditBtn) {
+            streamForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const streamIdToEdit = document.getElementById('stream-edit-id').value;
+                const name = document.getElementById('stream-name').value.trim();
+                const url = document.getElementById('stream-url').value.trim();
+                const type = document.getElementById('stream-type').value;
+                const isDefault = document.getElementById('stream-is-default').checked;
+
+                if (!name || !url) {
+                    alert("Name und URL dürfen nicht leer sein.");
+                    return;
+                }
+                // Rudimentary URL validation (could be more sophisticated)
+                try {
+                    new URL(url);
+                } catch (_) {
+                    alert("Bitte geben Sie eine gültige URL ein.");
+                    return;
+                }
+
+
+                const streamData = { name, url, type, isDefault };
+
+                if (streamIdToEdit) { // Editing existing stream
+                    // Find index by ID, as original index might change if other items are deleted/added
+                    const indexToUpdate = streams.findIndex(s => s.id === streamIdToEdit);
+                    if (indexToUpdate !== -1) {
+                        // streamData.id will be set by updateStream from original
+                        updateStream(indexToUpdate, streamData);
+                    } else {
+                        alert("Fehler: Zu bearbeitender Stream nicht gefunden.");
+                    }
+                } else { // Adding new stream
+                    // streamData.id will be generated by addStream if not present
+                    addStream(streamData);
+                }
+
+                // Reset form to "add mode"
+                streamForm.reset();
+                document.getElementById('stream-edit-id').value = '';
+                document.getElementById('stream-edit-form-container').querySelector('h3').textContent = 'Stream hinzufügen';
+                document.getElementById('save-stream-btn').textContent = 'Hinzufügen';
+                cancelEditBtn.style.display = 'none';
+                renderStreamManagementList(); // Re-render the list
+            });
+
+            cancelEditBtn.addEventListener('click', () => {
+                streamForm.reset();
+                document.getElementById('stream-edit-id').value = '';
+                document.getElementById('stream-edit-form-container').querySelector('h3').textContent = 'Stream hinzufügen';
+                document.getElementById('save-stream-btn').textContent = 'Hinzufügen';
+                cancelEditBtn.style.display = 'none';
+            });
+        }
+
+
+    } else {
+        console.error("Modal elements not found, stream management UI will not work.");
+    }
+
 });

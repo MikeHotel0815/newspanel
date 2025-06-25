@@ -19,6 +19,20 @@ body {
     /* background-color: rgba(255, 0, 0, 0.1); */ /* For debugging */
 }
 
+#manage-streams-btn {
+    margin-left: 15px;
+    padding: 0.3rem 0.6rem;
+    background-color: #555;
+    color: white;
+    border: 1px solid #777;
+    border-radius: 4px;
+    cursor: pointer;
+}
+#manage-streams-btn:hover {
+    background-color: #777;
+}
+
+
 header {
     background-color: #333;
     color: #fff;
@@ -103,6 +117,126 @@ main {
     to {
         box-shadow: 0 0 18px 6px rgba(255, 0, 0, 0.7), 0 2px 5px rgba(0,0,0,0.2); /* Kombiniere mit existierendem Schatten */
     }
+}
+
+/* Modal Base */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed;
+    z-index: 2000; /* Above everything else */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgba(0,0,0,0.6); /* Dim background */
+    padding-top: 60px; /* Location of the box */
+}
+
+.modal.modal-open {
+    display: block;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto; /* 5% from the top and centered */
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%; /* Could be more or less, depending on screen size */
+    max-width: 700px;
+    border-radius: 8px;
+    position: relative;
+}
+
+.modal-close-btn {
+    color: #aaa;
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.modal-close-btn:hover,
+.modal-close-btn:focus {
+    color: black;
+    text-decoration: none;
+}
+
+/* Stream List Editor in Modal */
+#modal-stream-list-container {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    margin-bottom: 20px;
+    padding: 10px;
+}
+
+#modal-stream-list-container .stream-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+#modal-stream-list-container .stream-item:last-child {
+    border-bottom: none;
+}
+
+#modal-stream-list-container .stream-details {
+    flex-grow: 1;
+}
+#modal-stream-list-container .stream-actions button {
+    margin-left: 5px;
+    padding: 3px 7px;
+    cursor: pointer;
+}
+#modal-stream-list-container .stream-actions input[type="checkbox"] {
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+
+/* Stream Edit Form in Modal */
+#stream-form div {
+    margin-bottom: 10px;
+}
+#stream-form label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+#stream-form input[type="text"],
+#stream-form input[type="url"],
+#stream-form select {
+    width: calc(100% - 12px); /* Full width minus padding/border */
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+#stream-form input[type="checkbox"] {
+    vertical-align: middle;
+    margin-right: 5px;
+}
+
+#stream-form button {
+    padding: 8px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+#stream-form button:hover {
+    background-color: #0056b3;
+}
+#stream-form button#cancel-edit-btn {
+    background-color: #6c757d;
+    margin-left: 10px;
+}
+#stream-form button#cancel-edit-btn:hover {
+    background-color: #545b62;
 }
 
 .video-player-wrapper video {

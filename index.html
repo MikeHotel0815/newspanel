@@ -15,6 +15,7 @@
             <select id="stream-select">
                 <option value="" disabled selected>-- Bitte wählen --</option>
             </select>
+            <button id="manage-streams-btn" type="button">Streams verwalten</button>
         </div>
     </header>
 
@@ -23,6 +24,48 @@
             <!-- Videoplayer werden hier dynamisch hinzugefügt -->
         </div>
     </main>
+
+    <div id="stream-manager-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close-btn">&times;</span>
+            <h2>Stream-Verwaltung</h2>
+
+            <div id="stream-list-editor">
+                <h3>Aktuelle Streams</h3>
+                <div id="modal-stream-list-container">
+                    <!-- Stream-Liste wird hier von JS eingefügt -->
+                </div>
+            </div>
+
+            <div id="stream-edit-form-container">
+                <h3>Stream hinzufügen / bearbeiten</h3>
+                <form id="stream-form">
+                    <input type="hidden" id="stream-edit-id" value="">
+                    <div>
+                        <label for="stream-name">Name:</label>
+                        <input type="text" id="stream-name" required>
+                    </div>
+                    <div>
+                        <label for="stream-url">URL:</label>
+                        <input type="url" id="stream-url" required>
+                    </div>
+                    <div>
+                        <label for="stream-type">Typ:</label>
+                        <select id="stream-type">
+                            <option value="hls">HLS</option>
+                            <option value="youtube">YouTube</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="stream-is-default">Standardmäßig laden:</label>
+                        <input type="checkbox" id="stream-is-default">
+                    </div>
+                    <button type="submit" id="save-stream-btn">Speichern</button>
+                    <button type="button" id="cancel-edit-btn" style="display:none;">Abbrechen</button>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <!-- HLS.js Bibliothek -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
