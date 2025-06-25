@@ -375,3 +375,10 @@ main {
         margin-bottom: 0.3rem;
     }
 }
+
+/* Styling for dragged video player */
+.video-player-wrapper.dragging {
+    opacity: 0.5;
+    border: 3px dashed #007bff; /* Example: blue dashed border */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}

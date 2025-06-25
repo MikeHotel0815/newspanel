@@ -1,6 +1,7 @@
 // --- Global Constants & Variables ---
 const LS_STREAMS_KEY = 'hlsAppUserStreams';
 const LS_GLOBAL_SETTINGS_KEY = 'hlsAppGlobalSettings';
+const LS_GRID_LAYOUT_KEY = 'hlsAppGridLayout'; // New key for grid layout
 
 let globalSettings = {
     enableSubtitles: false
@@ -82,13 +83,103 @@ function loadGlobalSettings() {
 loadStreamsFromStorage();
 loadGlobalSettings();
 
+// --- Grid Layout Persistence ---
+function loadGridLayoutFromStorage() {
+    try {
+        const storedLayout = localStorage.getItem(LS_GRID_LAYOUT_KEY);
+        if (storedLayout) {
+            const orderedStreamIds = JSON.parse(storedLayout);
+            console.log("Loaded grid layout from localStorage:", orderedStreamIds);
+            return orderedStreamIds;
+        }
+    } catch (e) {
+        console.error("Error loading grid layout from localStorage:", e);
+    }
+    return null;
+}
+
+function applyGridLayout(orderedStreamIds) {
+    if (!orderedStreamIds || orderedStreamIds.length === 0) {
+        // No saved layout, or empty layout. Load default streams as usual.
+        console.log("No saved layout or empty layout. Loading default streams.");
+        streams.forEach(stream => {
+            if (stream.isDefault) {
+                console.log("Auto-loading default stream:", stream.name, "ID:", stream.id);
+                const playerInstanceId = `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-default`;
+                if (!playerInstances[playerInstanceId]) {
+                    addStreamToGrid(stream.url, stream.name, stream.type, playerInstanceId, stream.id);
+                }
+            }
+        });
+        return;
+    }
+
+    console.log("Applying grid layout:", orderedStreamIds);
+    // Clear existing players from grid (if any were loaded before this function is called)
+    const playerIdsToRemove = Object.keys(playerInstances);
+    if (playerIdsToRemove.length > 0) {
+        console.log("Clearing existing players from grid before applying layout:", playerIdsToRemove);
+        playerIdsToRemove.forEach(playerId => {
+            removeStreamFromGrid(playerId);
+        });
+    }
+
+    let streamsFoundInLayout = 0;
+    orderedStreamIds.forEach(streamId => {
+        const streamToLoad = streams.find(s => s.id === streamId);
+        if (streamToLoad) {
+            console.log("Loading stream from layout:", streamToLoad.name, "ID:", streamToLoad.id);
+            const playerInstanceId = `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-layout-${streamToLoad.id}`;
+            if (!playerInstances[playerInstanceId]) {
+                addStreamToGrid(streamToLoad.url, streamToLoad.name, streamToLoad.type, playerInstanceId, streamToLoad.id);
+                streamsFoundInLayout++;
+            }
+        } else {
+            console.warn(`Stream ID ${streamId} from saved layout not found in current streams list. Skipping.`);
+        }
+    });
+
+    // Decision: What to do with default streams NOT in the layout?
+    // Option 1: Add them at the end.
+    // Option 2: Don't add them if a layout is present. (Current implementation below)
+    // Option 3: Add them only if NO streams from the layout were found.
+
+    if (streamsFoundInLayout === 0) {
+        // If no streams from the layout could be loaded (e.g., all deleted), then load defaults.
+        console.log("No streams from layout were loaded. Reverting to default streams.");
+        streams.forEach(stream => {
+            if (stream.isDefault) {
+                console.log("Auto-loading default stream (fallback):", stream.name, "ID:", stream.id);
+                const playerInstanceId = `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-default-fallback`;
+                if (!playerInstances[playerInstanceId]) {
+                    addStreamToGrid(stream.url, stream.name, stream.type, playerInstanceId, stream.id);
+                }
+            }
+        });
+    }
+    // If we want to add default streams that are NOT in the loaded layout:
+    /*
+    streams.forEach(stream => {
+        if (stream.isDefault && !orderedStreamIds.includes(stream.id)) {
+            const playerInstanceId = `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-default-append`;
+            if (!playerInstances[playerInstanceId]) {
+                addStreamToGrid(stream.url, stream.name, stream.type, playerInstanceId, stream.id);
+            }
+        }
+    });
+    */
+    updateGridLayout(); // Ensure grid is updated after applying layout
+}
+
+
 // --- YouTube API Specific ---
 function onYouTubeIframeAPIReady() {
     console.log("[YT Log] onYouTubeIframeAPIReady called. API is ready.");
     youtubeApiReady = true;
     youtubePlayerQueue.forEach(playerInfo => {
         console.log("[YT Log] Processing queued player:", playerInfo);
-        createYouTubePlayer(playerInfo.playerId, playerInfo.videoId, playerInfo.playerWrapperId);
+        // Ensure streamId is passed from the queue
+        createYouTubePlayer(playerInfo.playerId, playerInfo.videoId, playerInfo.playerWrapperId, playerInfo.streamId);
     });
     youtubePlayerQueue = [];
 }
@@ -122,8 +213,9 @@ function getYoutubeVideoId(url) {
     return videoId;
 }
 
-function createYouTubePlayer(playerId, videoId, wrapperId) {
-    console.log(`[YT Log] createYouTubePlayer called. PlayerID: ${playerId}, VideoID: ${videoId}, WrapperID: ${wrapperId}`);
+// Modified to accept and store streamId
+function createYouTubePlayer(playerId, videoId, wrapperId, streamId) {
+    console.log(`[YT Log] createYouTubePlayer called. PlayerID: ${playerId}, VideoID: ${videoId}, WrapperID: ${wrapperId}, StreamID: ${streamId}`);
     const player = new YT.Player(playerId, {
         height: '100%', width: '100%', videoId: videoId,
         playerVars: { 'autoplay': 1, 'controls': 1, 'mute': 1, 'playsinline': 1, 'cc_load_policy': 0 },
@@ -132,7 +224,8 @@ function createYouTubePlayer(playerId, videoId, wrapperId) {
                 console.log("[YT Log] YouTube Player onReady event. PlayerID:", playerId);
                 event.target.mute();
                 event.target.playVideo();
-                playerInstances[playerId] = { type: 'youtube', player: event.target, wrapperId: wrapperId, url: `https://www.youtube.com/watch?v=${videoId}` };
+                // Store streamId passed to the function
+                playerInstances[playerId] = { type: 'youtube', player: event.target, wrapperId: wrapperId, url: `https://www.youtube.com/watch?v=${videoId}`, streamId: streamId };
                 if (playerInstances[playerId]) {
                     applySubtitleSettingToYouTubePlayer(playerInstances[playerId], globalSettings.enableSubtitles);
                 }
@@ -274,11 +367,14 @@ function applySubtitleSettingsToAllPlayers() {
 }
 
 // --- UI and Player Creation ---
-function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId) {
+// Modified to include streamId for layout persistence
+function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId, streamId) {
     const playerWrapperId = playerInstanceId + "-wrapper";
     const videoWrapper = document.createElement('div');
     videoWrapper.classList.add('video-player-wrapper');
     videoWrapper.id = playerWrapperId;
+    videoWrapper.draggable = true; // Make the wrapper draggable
+    videoWrapper.dataset.playerId = playerInstanceId; // Store player ID for drag identification
 
     if (streamType === 'hls') {
         if (!Hls.isSupported()) {
@@ -294,7 +390,8 @@ function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId) {
         });
         hls.loadSource(streamUrl);
         hls.attachMedia(videoElement);
-        playerInstances[playerInstanceId] = { type: 'hls', hls: hls, media: videoElement, wrapperId: playerWrapperId, url: streamUrl };
+        // Store streamId in playerInstances
+        playerInstances[playerInstanceId] = { type: 'hls', hls: hls, media: videoElement, wrapperId: playerWrapperId, url: streamUrl, streamId: streamId };
 
         const hlsPlayerReadyAndSubtitlesHandler = () => {
             if (playerInstances[playerInstanceId]) {
@@ -327,8 +424,9 @@ function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId) {
         const youtubePlayerDiv = document.createElement('div');
         youtubePlayerDiv.id = playerInstanceId;
         videoWrapper.appendChild(youtubePlayerDiv);
-        if (youtubeApiReady) createYouTubePlayer(playerInstanceId, videoId, playerWrapperId);
-        else youtubePlayerQueue.push({ playerId: playerInstanceId, videoId: videoId, playerWrapperId: playerWrapperId });
+        // Pass streamId to YouTube player creation process
+        if (youtubeApiReady) createYouTubePlayer(playerInstanceId, videoId, playerWrapperId, streamId);
+        else youtubePlayerQueue.push({ playerId: playerInstanceId, videoId: videoId, playerWrapperId: playerWrapperId, streamId: streamId });
     }
 
     const removeBtn = document.createElement('button');
@@ -363,6 +461,7 @@ function removeStreamFromGrid(playerInstanceId) {
     }
     if (videoWrapper && videoWrapper.classList.contains('audio-active')) updateAudioActiveFrame(null);
     updateGridLayout();
+    updatePlayerOrderFromDOM(); // Update layout after removing a stream
 }
 
 function getCurrentFullscreenElement() { return document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement; }
@@ -504,23 +603,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     populateStreamDropdown();
 
-    streams.forEach(stream => {
-        if (stream.isDefault) {
-            console.log("Auto-loading default stream:", stream.name);
-            const playerInstanceId = `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-default`;
-            if (!playerInstances[playerInstanceId]) {
-                 addStreamToGrid(stream.url, stream.name, stream.type, playerInstanceId);
-            }
-        }
-    });
+    // Load and apply grid layout. applyGridLayout will handle defaults if necessary.
+    const savedGridLayout = loadGridLayoutFromStorage();
+    applyGridLayout(savedGridLayout); // Pass null if nothing was loaded
+
+    // Ensure grid layout is updated after initial load (applyGridLayout also calls it, but good to have it here too for clarity)
+    updateGridLayout();
 
     streamSelect.addEventListener('change', (event) => {
         const selectedOptionIndex = event.target.value;
         if (selectedOptionIndex === "" || !streams[selectedOptionIndex]) return;
         const selectedStream = streams[selectedOptionIndex];
         const playerInstanceId = `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        // The check !playerInstances[playerInstanceId] is technically always true due to unique ID generation.
+        // Consider if there's a case where it might not be, or simplify. For now, it's harmless.
         if (!playerInstances[playerInstanceId]) {
-            addStreamToGrid(selectedStream.url, selectedStream.name, selectedStream.type, playerInstanceId);
+            addStreamToGrid(selectedStream.url, selectedStream.name, selectedStream.type, playerInstanceId, selectedStream.id); // Pass selectedStream.id
+            updatePlayerOrderFromDOM(); // Save new layout after adding a stream
             event.target.value = "";
         }
     });
@@ -653,4 +752,97 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setTimeout(applySubtitleSettingsToAllPlayers, 500);
+
+    // --- Drag and Drop Logic for Video Grid ---
+    let draggedItem = null;
+
+    if (videoGridContainer) {
+        videoGridContainer.addEventListener('dragstart', (event) => {
+            const targetWrapper = event.target.closest('.video-player-wrapper');
+            if (targetWrapper && targetWrapper.draggable) {
+                draggedItem = targetWrapper;
+                event.dataTransfer.setData('text/plain', targetWrapper.id);
+                event.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => { // Make the dragged item semi-transparent
+                    if (draggedItem) draggedItem.classList.add('dragging');
+                }, 0);
+                console.log("Drag Start:", draggedItem.id);
+            } else {
+                event.preventDefault(); // Prevent dragging if not a draggable wrapper
+            }
+        });
+
+        videoGridContainer.addEventListener('dragover', (event) => {
+            event.preventDefault(); // Necessary to allow dropping
+            const target = event.target.closest('.video-player-wrapper');
+            if (target && target !== draggedItem && target.draggable) {
+                // Basic visual feedback for drop target
+                // More advanced feedback (e.g., placeholder) could be added here
+                // console.log("Drag Over:", target.id);
+            }
+        });
+
+        videoGridContainer.addEventListener('drop', (event) => {
+            event.preventDefault();
+            const targetWrapper = event.target.closest('.video-player-wrapper');
+            console.log("Drop on:", targetWrapper ? targetWrapper.id : 'grid container');
+
+            if (draggedItem && targetWrapper && targetWrapper !== draggedItem && videoGridContainer.contains(targetWrapper) && videoGridContainer.contains(draggedItem)) {
+                const rect = targetWrapper.getBoundingClientRect();
+                const offsetX = event.clientX - rect.left;
+                const isAfter = offsetX > rect.width / 2;
+
+                // Determine insertion point
+                if (isAfter) {
+                    targetWrapper.parentNode.insertBefore(draggedItem, targetWrapper.nextSibling);
+                } else {
+                    targetWrapper.parentNode.insertBefore(draggedItem, targetWrapper);
+                }
+                console.log(`Dropped ${draggedItem.id} ${isAfter ? 'after' : 'before'} ${targetWrapper.id}`);
+            } else if (draggedItem && event.target === videoGridContainer) {
+                // If dropped directly onto the container (e.g., in an empty space or last position)
+                // Append to the end. More sophisticated logic might be needed for specific empty spots.
+                videoGridContainer.appendChild(draggedItem);
+                 console.log(`Dropped ${draggedItem.id} onto container`);
+            }
+            // No cleanup of 'dragging' class here, handled in dragend
+        });
+
+        videoGridContainer.addEventListener('dragend', (event) => {
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+                console.log("Drag End:", draggedItem.id);
+            }
+            draggedItem = null;
+            // Note: updateGridLayout() might be useful here if the number of columns/rows
+            // depends on the order or if specific re-ordering logic needs visual refresh.
+            // However, simple DOM reordering within the CSS grid should adjust automatically.
+            // If playerInstances order needs to be synced, this is the place.
+            updatePlayerOrderFromDOM();
+        });
+
+        function updatePlayerOrderFromDOM() {
+            if (!videoGridContainer) return;
+            const orderedStreamIds = [];
+            const wrappers = videoGridContainer.querySelectorAll('.video-player-wrapper');
+            wrappers.forEach(wrapper => {
+                const playerId = wrapper.dataset.playerId;
+                if (playerId && playerInstances[playerId] && playerInstances[playerId].streamId) {
+                    orderedStreamIds.push(playerInstances[playerId].streamId);
+                } else if (playerId && playerInstances[playerId] && !playerInstances[playerId].streamId) {
+                    console.warn(`Player instance ${playerId} is missing a streamId. It won't be saved in layout.`);
+                }
+            });
+            console.log("Current visual order of stream IDs:", orderedStreamIds);
+            try {
+                localStorage.setItem(LS_GRID_LAYOUT_KEY, JSON.stringify(orderedStreamIds));
+                console.log("Saved grid layout to localStorage:", orderedStreamIds);
+            } catch (e) {
+                console.error("Error saving grid layout to localStorage:", e);
+            }
+        }
+
+    } else {
+        console.error("videoGridContainer not found, drag and drop for videos will not work.");
+    }
 });
