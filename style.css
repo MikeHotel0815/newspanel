@@ -124,9 +124,30 @@ main {
     }
 }
 
-@media (max-width: 480px) {
+/* Portrait-Modus: Höhe ist größer als Breite */
+@media (orientation: portrait) {
     #video-grid-container {
-        grid-template-columns: 1fr; /* Ein Video pro Zeile auf sehr kleinen Bildschirmen */
+        grid-template-columns: 1fr; /* Eine Spalte */
+    }
+}
+
+@media (max-width: 480px) {
+    /* Diese Regel könnte mit der Portrait-Regel interagieren.
+       Die Portrait-Regel ist spezifischer für die Orientierung.
+       Wenn max-width: 480px auch im Portrait-Modus gilt, ist 1fr bereits gesetzt.
+       Wenn max-width: 480px im Landscape-Modus gilt, würde diese Regel 1fr setzen,
+       was für sehr schmale Landscape-Geräte sinnvoll sein kann.
+       Die (orientation: portrait) ist oft die stärkere Bedingung für einspaltige Layouts.
+       Wir behalten sie, aber die Portrait-Regel wird sie für Portrait-Ansichten überschreiben,
+       falls die Logik in JS nicht ohnehin schon 1 Spalte für Portrait vorgibt.
+    */
+    #video-grid-container {
+        /* Die (orientation: portrait) Regel oben ist meist ausreichend.
+           Diese Regel hier würde greifen, wenn das Gerät sehr schmal ist,
+           aber im Landscape-Modus ist. Bei 480px Breite im Landscape ist 1 Spalte
+           wahrscheinlich auch sinnvoll.
+        */
+        /* grid-template-columns: 1fr; */ /* Vorerst auskommentiert, um die Portrait-Regel klarer zu testen */
     }
     .controls {
         display: flex;

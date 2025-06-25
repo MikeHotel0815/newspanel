@@ -212,49 +212,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateGridLayout() {
         const numVideos = videoGridContainer.children.length;
-        videoGridContainer.classList.remove('grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'); // Remove old classes
+        const isPortrait = window.innerHeight > window.innerWidth;
+
+        // Entferne alte CSS-Klassen für Spalten, falls vorhanden (waren im vorherigen Code, jetzt nicht mehr)
+        // videoGridContainer.classList.remove('grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4');
 
         if (numVideos === 0) {
-            // Optional: Show a message or placeholder
+            videoGridContainer.style.gridTemplateColumns = 'none'; // Keine Spalten, wenn keine Videos da sind
             return;
         }
-        if (numVideos === 1) {
-            videoGridContainer.classList.add('grid-cols-1');
-        } else if (numVideos === 2) {
-            videoGridContainer.classList.add('grid-cols-2');
-        } else if (numVideos === 3) {
-            // For 3 videos, we could do 3 columns, or 2 on top, 1 on bottom.
-            // Using CSS Grid's auto-fit with minmax is often better for this.
-            // The explicit classes are more for specific overrides if needed.
-            // For now, rely on the auto-fit from style.css or add specific logic.
-            // Example for 3 videos: 2 columns, last item spans full width if it's alone in new row
-            // This logic can get complex and might be better handled by more advanced CSS or a library
-            // For simplicity, we'll use a direct column count for now.
-            videoGridContainer.style.gridTemplateColumns = `repeat(${Math.min(numVideos, 3)}, 1fr)`;
 
-        } else if (numVideos >= 4) {
-             // For 4 or more, default to auto-fit or a specific number of columns
-            const columns = Math.ceil(Math.sqrt(numVideos)); // e.g., 4 videos -> 2x2, 5-6 videos -> 3xN
-            videoGridContainer.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
-        }
-
-        // A simpler approach for dynamic grid columns using the auto-fit behavior from CSS:
-        // The `grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));` in style.css
-        // should handle most cases well. The JS override is for more specific control if auto-fit
-        // isn't behaving as desired for certain numbers of items.
-        // If we want JS to fully control it:
-        if (numVideos > 0) {
+        if (isPortrait) {
+            // Im Portrait-Modus immer eine Spalte
+            videoGridContainer.style.gridTemplateColumns = '1fr';
+        } else {
+            // Landscape-Modus: Bisherige Logik zur Spaltenberechnung anwenden
+            // Diese Logik scheint die komplexere von zwei Versionen im vorherigen Code zu sein.
+            // Wir verwenden die, die zuletzt aktiv war (die untere der beiden if-Blöcke).
             let cols;
             if (numVideos === 1) cols = 1;
-            else if (numVideos <= 4) cols = 2; // 2x1, 2x2
-            else if (numVideos <= 9) cols = 3; // 3x1, 3x2, 3x3
-            else cols = 4; // Max 4 columns for sanity, adjust as needed
+            else if (numVideos <= 4) cols = 2; // 2 Videos = 2 Spalten; 3 Videos = 2 Spalten; 4 Videos = 2 Spalten
+            else if (numVideos <= 9) cols = 3; // 5-9 Videos = 3 Spalten
+            else cols = 4; // Mehr als 9 Videos = 4 Spalten (Maximum)
+
+            // Die Logik `Math.ceil(Math.sqrt(numVideos))` war auch eine Option, die dynamischer ist.
+            // Beispiel: 3 Videos -> Math.ceil(sqrt(3)) = 2 Spalten
+            // Beispiel: 4 Videos -> Math.ceil(sqrt(4)) = 2 Spalten
+            // Beispiel: 5 Videos -> Math.ceil(sqrt(5)) = 3 Spalten
+            // Wir verwenden die explizitere if/else Kaskade, die zuletzt aktiv war.
             videoGridContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-        } else {
-            videoGridContainer.style.gridTemplateColumns = 'none';
         }
     }
 
-    // Initial layout update in case there are pre-loaded videos (not in this version)
+    // Initial layout update
     updateGridLayout();
+
+    // Update layout on window resize (e.g., orientation change)
+    window.addEventListener('resize', updateGridLayout);
 });
