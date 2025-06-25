@@ -51,8 +51,14 @@ main {
 .video-player-wrapper {
     position: relative;
     background-color: #000;
-    border: 1px solid #555;
+    border: 2px solid transparent; /* Standardrahmen für Layout-Konsistenz */
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: border-color 0.3s ease; /* Sanfter Übergang für die Rahmenfarbe */
+}
+
+.video-player-wrapper.audio-active {
+    border-color: red;
+    /* Optional: box-shadow: 0 0 10px red; */
 }
 
 .video-player-wrapper video {

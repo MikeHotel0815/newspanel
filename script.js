@@ -136,6 +136,10 @@ document.addEventListener('DOMContentLoaded', () => {
             hlsInstances[playerInstanceId].destroy(); // Clean up HLS.js instance
             delete hlsInstances[playerInstanceId];
         }
+        // Check if the removed stream was the one with the active audio frame
+        if (videoWrapper && videoWrapper.classList.contains('audio-active')) {
+            updateAudioActiveFrame(null); // Remove frame if active one is removed
+        }
         updateGridLayout();
     }
 
@@ -162,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     vid_iter.muted = true;  // Mute others
                 }
             });
+            updateAudioActiveFrame(activePlayerId); // Update frame for grid click
             // Fullscreen logic removed from here for single click in grid
         }
         // If another video is in fullscreen, a simple click on a non-fullscreen grid video does nothing to that grid video's sound or fullscreen state.
@@ -197,6 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     vid_iter.muted = true;  // Mute others
                 }
             });
+            updateAudioActiveFrame(activePlayerId); // Update frame for grid dblclick (before fullscreen)
 
             if (videoElement.requestFullscreen) {
                 videoElement.requestFullscreen();
@@ -223,6 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('#video-grid-container video').forEach(vid => {
                 vid.muted = true; // Mute all videos
             });
+            updateAudioActiveFrame(null); // Remove all active frames when exiting fullscreen
         }
     }
 
@@ -266,4 +273,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Update layout on window resize (e.g., orientation change)
     window.addEventListener('resize', updateGridLayout);
+
+    function updateAudioActiveFrame(activePlayerId) {
+        document.querySelectorAll('.video-player-wrapper').forEach(wrapper => {
+            if (wrapper.id === activePlayerId) {
+                wrapper.classList.add('audio-active');
+            } else {
+                wrapper.classList.remove('audio-active');
+            }
+        });
+    }
 });
