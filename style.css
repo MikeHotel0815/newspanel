@@ -59,7 +59,7 @@ main {
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: cover; /* Stellt sicher, dass das Video den Container füllt, kann zu Abschnitten führen */
+    object-fit: contain; /* Stellt sicher, dass das Video immer vollständig sichtbar ist, ggf. mit Letter-/Pillarboxing */
 }
 
 .remove-stream-btn {
