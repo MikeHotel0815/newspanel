@@ -51,14 +51,27 @@ main {
 .video-player-wrapper {
     position: relative;
     background-color: #000;
-    border: 2px solid transparent; /* Standardrahmen für Layout-Konsistenz */
+    border: 3px solid transparent; /* Erhöhte Standardrahmenbreite für Layout-Konsistenz */
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     transition: border-color 0.3s ease; /* Sanfter Übergang für die Rahmenfarbe */
 }
 
 .video-player-wrapper.audio-active {
-    border-color: red;
-    /* Optional: box-shadow: 0 0 10px red; */
+    border-color: red; /* Die Rahmenfarbe wird hier gesetzt, die Breite vom Basis-Style geerbt */
+    animation: pulseRedGlow 1.2s infinite alternate ease-in-out;
+    /* Setze den initialen box-shadow, damit er auch ohne Animation (oder vor dem ersten Zyklus) da ist
+       und als Basis für die Animation dient. Dieser sollte dem 'from' oder 'to' Zustand entsprechen,
+       oder ein Mittelwert sein, je nach gewünschtem Startaussehen. */
+    box-shadow: 0 0 8px 2px rgba(255, 0, 0, 0.5), 0 2px 5px rgba(0,0,0,0.2);
+}
+
+@keyframes pulseRedGlow {
+    from {
+        box-shadow: 0 0 8px 2px rgba(255, 0, 0, 0.5), 0 2px 5px rgba(0,0,0,0.2); /* Kombiniere mit existierendem Schatten */
+    }
+    to {
+        box-shadow: 0 0 18px 6px rgba(255, 0, 0, 0.7), 0 2px 5px rgba(0,0,0,0.2); /* Kombiniere mit existierendem Schatten */
+    }
 }
 
 .video-player-wrapper video {
