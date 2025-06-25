@@ -1,14 +1,20 @@
 // --- Global Variables and Helper Functions ---
+const LS_STREAMS_KEY = 'hlsAppUserStreams';
+// Storing isDefault directly in the stream object, so a separate key for IDs is not strictly needed for now.
+// const LS_DEFAULT_STREAM_IDS_KEY = 'hlsAppDefaultStreamIds';
+
 let youtubeApiReady = false;
 let youtubePlayerQueue = [];
 let playerInstances = {};
+let streams = []; // Will be populated from localStorage or defaults
 
-const streams = [
-    { name: "WeltTV (HLS)", type: "hls", url: "https://w-live2weltcms.akamaized.net/hls/live/2041019/Welt-LivePGM/index.m3u8" },
-    { name: "PhoenixHD (HLS)", type: "hls", url: "https://zdf-hls-19.akamaized.net/hls/live/2016502/de/high/master.m3u8" },
-    { name: "N-TV (HLS)", type: "hls", url: "http://hlsntv-i.akamaihd.net/hls/live/218889/ntv/master.m3u8" },
-    { name: "Big Buck Bunny (YouTube)", type: "youtube", url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ" },
-    { name: "Elephants Dream (YouTube)", type: "youtube", url: "https://www.youtube.com/watch?v=M7lc1UVf-VE" }
+// Default streams if nothing in localStorage or if localStorage parsing fails
+const defaultInitialStreams = [
+    { id: 'default-hls-welt', name: "WeltTV (HLS)", type: "hls", url: "https://w-live2weltcms.akamaized.net/hls/live/2041019/Welt-LivePGM/index.m3u8", isDefault: true },
+    { id: 'default-hls-phoenix', name: "PhoenixHD (HLS)", type: "hls", url: "https://zdf-hls-19.akamaized.net/hls/live/2016502/de/high/master.m3u8", isDefault: false },
+    { id: 'default-hls-ntv', name: "N-TV (HLS)", type: "hls", url: "http://hlsntv-i.akamaihd.net/hls/live/218889/ntv/master.m3u8", isDefault: false },
+    { id: 'default-yt-bbb', name: "Big Buck Bunny (YouTube)", type: "youtube", url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ", isDefault: false },
+    { id: 'default-yt-ed', name: "Elephants Dream (YouTube)", type: "youtube", url: "https://www.youtube.com/watch?v=M7lc1UVf-VE", isDefault: false }
 ];
 
 // DOM Elements (will be initialized in DOMContentLoaded)
@@ -16,6 +22,101 @@ let streamSelect;
 let videoGridContainer;
 
 // This function is called by the YouTube IFrame Player API script once it's loaded
+function saveStreamsToStorage() {
+    try {
+        localStorage.setItem(LS_STREAMS_KEY, JSON.stringify(streams));
+    } catch (e) {
+        console.error("Error saving streams to localStorage:", e);
+    }
+}
+
+// --- CRUD Functions for Streams ---
+function addStream(newStream) {
+    if (!newStream || !newStream.name || !newStream.url || !newStream.type) {
+        console.error("Invalid stream object provided to addStream:", newStream);
+        return false;
+    }
+    // Basic validation for type
+    if (newStream.type !== 'hls' && newStream.type !== 'youtube') {
+        console.error("Invalid stream type for addStream:", newStream.type);
+        return false;
+    }
+    // Ensure new streams have an ID and default isDefault
+    if (!newStream.id) {
+        newStream.id = `stream-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    }
+    if (typeof newStream.isDefault === 'undefined') {
+        newStream.isDefault = false;
+    }
+
+    streams.push(newStream);
+    saveStreamsToStorage();
+    populateStreamDropdown(); // Update dropdown
+    console.log("Stream added:", newStream, "Current streams:", streams);
+    return true;
+}
+
+function updateStream(index, updatedStream) {
+    if (index < 0 || index >= streams.length) {
+        console.error("Invalid index for updateStream:", index);
+        return false;
+    }
+    if (!updatedStream || !updatedStream.name || !updatedStream.url || !updatedStream.type) {
+        console.error("Invalid stream object provided to updateStream:", updatedStream);
+        return false;
+    }
+    // Basic validation for type
+    if (updatedStream.type !== 'hls' && updatedStream.type !== 'youtube') {
+        console.error("Invalid stream type for updateStream:", updatedStream.type);
+        return false;
+    }
+    // Preserve ID and isDefault if not explicitly in updatedStream, or ensure they are valid
+    updatedStream.id = streams[index].id; // Keep original ID
+    updatedStream.isDefault = typeof updatedStream.isDefault !== 'undefined' ? updatedStream.isDefault : streams[index].isDefault;
+
+
+    streams[index] = updatedStream;
+    saveStreamsToStorage();
+    populateStreamDropdown(); // Update dropdown
+    console.log("Stream updated at index:", index, "New data:", updatedStream, "Current streams:", streams);
+    return true;
+}
+
+function deleteStream(index) {
+    if (index < 0 || index >= streams.length) {
+        console.error("Invalid index for deleteStream:", index);
+        return false;
+    }
+    const removedStream = streams.splice(index, 1)[0];
+    saveStreamsToStorage();
+    populateStreamDropdown(); // Update dropdown
+    console.log("Stream removed:", removedStream, "Current streams:", streams);
+
+    // If the removed stream was active in the grid, clear its player and frame
+    // This requires more complex logic to find if playerInstanceId matches removedStream.id
+    // For now, this is handled by the UI part later if a stream is removed while playing.
+    // A simple approach: if any stream is active, and it's the one being deleted, clear active frame.
+    // This is hard to do without direct access to which player instance ID belongs to 'index'.
+    // The UI will need to handle this by potentially calling removeStreamFromGrid with the correct playerInstanceId.
+
+    return true;
+}
+
+function setStreamDefaultStatus(streamId, isDefault) {
+    const streamIndex = streams.findIndex(s => s.id === streamId);
+    if (streamIndex === -1) {
+        console.error("Stream not found for setDefaultStatus, ID:", streamId);
+        return false;
+    }
+    streams[streamIndex].isDefault = !!isDefault; // Ensure boolean
+    saveStreamsToStorage();
+    // No need to repopulate dropdown, as isDefault doesn't affect its display directly
+    // However, if the UI for managing streams is open, it might need an update.
+    console.log(`Stream ID ${streamId} isDefault set to ${streams[streamIndex].isDefault}`);
+    return true;
+}
+
+
 function onYouTubeIframeAPIReady() {
     console.log("[YT Log] onYouTubeIframeAPIReady called. API is ready.");
     youtubeApiReady = true;
@@ -25,6 +126,59 @@ function onYouTubeIframeAPIReady() {
     });
     youtubePlayerQueue = [];
 }
+
+function loadStreamsFromStorage() {
+    try {
+        const storedStreams = localStorage.getItem(LS_STREAMS_KEY);
+        if (storedStreams) {
+            streams = JSON.parse(storedStreams);
+            // Ensure IDs are present if old data without IDs is loaded (optional migration)
+            streams.forEach((s, index) => {
+                if (!s.id) s.id = `stream-${Date.now()}-${index}`;
+                if (typeof s.isDefault === 'undefined') s.isDefault = false;
+            });
+        } else {
+            // No streams in storage, use defaults and save them
+            streams = JSON.parse(JSON.stringify(defaultInitialStreams)); // Deep copy
+            saveStreamsToStorage();
+        }
+    } catch (e) {
+        console.error("Error loading streams from localStorage, using defaults:", e);
+        streams = JSON.parse(JSON.stringify(defaultInitialStreams)); // Deep copy on error too
+        // Optionally clear potentially corrupted storage
+        // localStorage.removeItem(LS_STREAMS_KEY);
+    }
+}
+// Load streams at the very beginning
+loadStreamsFromStorage();
+
+function populateStreamDropdown() {
+    // console.log("populateStreamDropdown called"); // Logging
+    if (!streamSelect || !streams) { // Guard clause
+        // console.warn("populateStreamDropdown: streamSelect or streams array not ready.");
+        return;
+    }
+
+    const currentSelectedIndex = streamSelect.value; // Preserve selection if possible (by index)
+
+    streamSelect.innerHTML = '<option value="" disabled>-- Bitte wählen --</option>'; // Default option
+
+    streams.forEach((stream, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = stream.name;
+        // option.dataset.streamType = stream.type; // Already available via streams[index].type
+        streamSelect.appendChild(option);
+    });
+
+    // Try to restore selection if the index is still valid
+    if (currentSelectedIndex !== "" && parseInt(currentSelectedIndex) < streams.length) {
+        streamSelect.value = currentSelectedIndex;
+    } else {
+        streamSelect.value = ""; // Select the default "Bitte wählen"
+    }
+}
+
 
 function getYoutubeVideoId(url) {
     console.log("[YT Log] getYoutubeVideoId called with URL:", url);
@@ -106,7 +260,7 @@ function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId) {
         if (!Hls.isSupported()) {
             console.error("HLS.js is not supported in this browser.");
             videoWrapper.innerHTML = `<p style="color:red; padding:10px;">HLS.js not supported.</p>`;
-            videoGridContainer.appendChild(videoWrapper);
+            if (videoGridContainer) videoGridContainer.appendChild(videoWrapper); else console.error("videoGridContainer not ready for HLS error message");
             return;
         }
         const videoElement = document.createElement('video');
@@ -153,7 +307,7 @@ function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId) {
         if (!videoId) {
             console.error("[YT Log] No Video ID extracted for URL:", streamUrl);
             videoWrapper.innerHTML = `<p style="color:red; padding:10px;">Invalid YouTube URL: ${streamName}</p>`;
-            videoGridContainer.appendChild(videoWrapper);
+            if (videoGridContainer) videoGridContainer.appendChild(videoWrapper); else console.error("videoGridContainer not ready for YT error message");
             return;
         }
         const youtubePlayerDiv = document.createElement('div');
@@ -178,7 +332,8 @@ function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId) {
         removeStreamFromGrid(playerInstanceId);
     });
     videoWrapper.appendChild(removeBtn);
-    videoGridContainer.appendChild(videoWrapper);
+    if (videoGridContainer) videoGridContainer.appendChild(videoWrapper); else console.error("videoGridContainer not ready for videoWrapper");
+
 
     const clickTargetElement = (streamType === 'hls') ? videoWrapper.querySelector('video') : videoWrapper.querySelector('#' + playerInstanceId);
     videoWrapper.addEventListener('click', (event) => {
@@ -238,14 +393,11 @@ function handleVideoWrapperClick(event, videoElement, activePlayerId) {
 
     if (isPlayerInFullscreen) {
         event.preventDefault();
-        let currentlyMuted;
-        if (instance.type === 'hls') {
-            currentlyMuted = instance.media.muted;
-            instance.media.muted = !currentlyMuted;
-        } else if (instance.type === 'youtube') {
-            currentlyMuted = instance.player.isMuted();
-            if (currentlyMuted) instance.player.unMute();
-            else instance.player.mute();
+        const wasMuted = isPlayerMuted(activePlayerId); // Use helper
+        if (wasMuted) {
+            unmutePlayer(activePlayerId);
+        } else {
+            mutePlayer(activePlayerId);
         }
     } else if (!currentFullscreenElement) {
         // Click in Grid view
@@ -367,14 +519,14 @@ function unmutePlayer(playerInstanceId) {
 
 function isPlayerMuted(playerInstanceId) {
     const instance = playerInstances[playerInstanceId];
-    if (!instance) return true; // Default to muted if instance not found
+    if (!instance) return true;
 
     if (instance.type === 'hls' && instance.media) {
         return instance.media.muted;
     } else if (instance.type === 'youtube' && instance.player && typeof instance.player.isMuted === 'function') {
         return instance.player.isMuted();
     }
-    return true; // Default to muted if type is unknown or player/media missing
+    return true;
 }
 
 // --- DOMContentLoaded ---
@@ -382,26 +534,49 @@ document.addEventListener('DOMContentLoaded', () => {
     streamSelect = document.getElementById('stream-select');
     videoGridContainer = document.getElementById('video-grid-container');
 
-    streams.forEach((stream, index) => {
-        const option = document.createElement('option');
-        option.value = index;
-        option.textContent = stream.name;
-        option.dataset.streamType = stream.type;
-        streamSelect.appendChild(option);
+    // Load streams and populate dropdown (this will be more complex with localStorage)
+    // loadStreamsFromStorage(); // Called globally now at the script start
+    populateStreamDropdown(); // Populate dropdown with loaded/default streams
+
+    // Auto-load default streams
+    streams.forEach(stream => {
+        if (stream.isDefault) {
+            console.log("Auto-loading default stream:", stream.name);
+            const playerInstanceId = `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-default`;
+            // Ensure we don't add duplicates if this logic runs multiple times or is complex
+            if (!playerInstances[playerInstanceId]) {
+                 addStreamToGrid(stream.url, stream.name, stream.type, playerInstanceId);
+            }
+        }
     });
 
     streamSelect.addEventListener('change', (event) => {
         const selectedOptionIndex = event.target.value;
-        if (selectedOptionIndex === "") return;
+        if (selectedOptionIndex === "" || !streams[selectedOptionIndex]) return; // Guard against invalid index
+
         const selectedStream = streams[selectedOptionIndex];
         const playerInstanceId = `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        if (!playerInstances[playerInstanceId]) {
+
+        // Check if a stream with the same URL is already in a player instance to avoid visual duplicates
+        // This is a simple check; more robust would be to check against stream.id if those were used as keys in playerInstances
+        let alreadyExists = false;
+        for (const key in playerInstances) {
+            const instance = playerInstances[key];
+            // This check is tricky: what defines "already exists"? Same URL?
+            // For now, we rely on unique playerInstanceId. If we want to prevent adding same stream URL:
+            // if (instance.url === selectedStream.url) { alreadyExists = true; break; }
+        }
+
+        if (!alreadyExists && !playerInstances[playerInstanceId]) { // Ensure playerInstanceId itself is also unique
             addStreamToGrid(selectedStream.url, selectedStream.name, selectedStream.type, playerInstanceId);
             event.target.value = "";
+        } else if (alreadyExists) {
+            console.log("Stream with this URL already in grid:", selectedStream.url);
+            event.target.value = ""; // Reset dropdown anyway
         }
     });
 
-    updateGridLayout();
+    updateGridLayout(); // Initial call
     window.addEventListener('resize', updateGridLayout);
 
     // Header visibility logic
@@ -427,13 +602,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         headerTriggerZone.addEventListener('mouseleave', () => {
             clearTimeout(headerVisibilityTimer);
-            // If mouse leaves trigger zone but header is already visible (timer fired),
-            // it should only hide if mouse also leaves the header itself.
-            // This is handled by header's own mouseleave.
         });
 
         header.addEventListener('mouseleave', () => {
-            clearTimeout(headerVisibilityTimer); // Clear timer if mouse quickly enters and leaves header
+            clearTimeout(headerVisibilityTimer);
             header.classList.remove('header-visible');
         });
     }
