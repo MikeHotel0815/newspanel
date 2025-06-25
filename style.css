@@ -1,0 +1,139 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+    background-color: #f4f4f4;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+header {
+    background-color: #333;
+    color: #fff;
+    padding: 1rem;
+    text-align: center;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+}
+
+.controls {
+    margin-top: 0.5rem;
+}
+
+.controls label {
+    margin-right: 0.5rem;
+}
+
+#stream-select {
+    padding: 0.3rem;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+main {
+    flex-grow: 1;
+    padding: 1rem;
+}
+
+#video-grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Standard-Grid, wird ggf. durch JS angepasst */
+    gap: 10px;
+    width: 100%;
+    height: calc(100vh - 150px); /* Beispielhöhe, anpassen nach Bedarf */
+    overflow-y: auto; /* Falls mehr Videos als Platz */
+}
+
+.video-player-wrapper {
+    position: relative;
+    background-color: #000;
+    border: 1px solid #555;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.video-player-wrapper video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Stellt sicher, dass das Video den Container füllt, kann zu Abschnitten führen */
+}
+
+.remove-stream-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background-color: rgba(255, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    font-size: 14px;
+    line-height: 25px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 10;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.remove-stream-btn:hover {
+    background-color: rgba(255, 0, 0, 1);
+    opacity: 1;
+}
+
+/* Vollbild-Styling */
+.video-player-wrapper video:-webkit-full-screen { /* Chrome, Safari, Opera */
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Im Vollbildmodus sollte das gesamte Video sichtbar sein */
+}
+.video-player-wrapper video:-moz-full-screen { /* Firefox */
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.video-player-wrapper video:-ms-fullscreen { /* IE11 */
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.video-player-wrapper video:fullscreen { /* Standard */
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Spezifische Grid-Layout-Klassen, die von JS gesetzt werden können */
+.grid-cols-1 { grid-template-columns: 1fr; }
+.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+/* usw. oder eine dynamischere Methode direkt in JS, falls erforderlich */
+
+/* Für den Fall, dass das Video-Grid sehr voll wird, könnte man die minmax-Breite anpassen */
+@media (max-width: 768px) {
+    #video-grid-container {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    }
+    header h1 {
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    #video-grid-container {
+        grid-template-columns: 1fr; /* Ein Video pro Zeile auf sehr kleinen Bildschirmen */
+    }
+    .controls {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .controls label {
+        margin-bottom: 0.3rem;
+    }
+}
