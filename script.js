@@ -3,12 +3,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const videoGridContainer = document.getElementById('video-grid-container');
     let hlsInstances = {}; // To keep track of HLS.js instances for cleanup
 
-    // Sample HLS streams (replace with your actual stream URLs)
+    // Updated HLS streams
     const streams = [
-        { name: "Big Buck Bunny", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
-        { name: "Sintel (MP4-basiert HLS)", url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8" },
-        { name: "Elephants Dream", url: "https://storage.googleapis.com/shaka-demo-assets/angel-one-hls/hls.m3u8"},
-        { name: "Live Stream Example (oft nicht 24/7 verfügbar)", url: "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8" }
+        { name: "WeltTV", url: "https://w-live2weltcms.akamaized.net/hls/live/2041019/Welt-LivePGM/index.m3u8" },
+        { name: "phoenixHD", url: "https://zdf-hls-19.akamaized.net/hls/live/2016502/de/high/master.m3u8" },
+        { name: "n-tv", url: "http://hlsntv-i.akamaihd.net/hls/live/218889/ntv/master.m3u8" }
     ];
 
     // Populate the dropdown
