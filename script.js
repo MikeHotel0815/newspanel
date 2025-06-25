@@ -3,7 +3,7 @@ const LS_STREAMS_KEY = 'hlsAppUserStreams';
 const LS_GLOBAL_SETTINGS_KEY = 'hlsAppGlobalSettings';
 
 let globalSettings = {
-    enableSubtitles: false // Default value
+    enableSubtitles: false
 };
 
 let youtubeApiReady = false;
@@ -24,11 +24,8 @@ let videoGridContainer;
 
 // --- Storage Functions ---
 function saveStreamsToStorage() {
-    try {
-        localStorage.setItem(LS_STREAMS_KEY, JSON.stringify(streams));
-    } catch (e) {
-        console.error("Error saving streams to localStorage:", e);
-    }
+    try { localStorage.setItem(LS_STREAMS_KEY, JSON.stringify(streams)); }
+    catch (e) { console.error("Error saving streams to localStorage:", e); }
 }
 
 function loadStreamsFromStorage() {
@@ -51,11 +48,8 @@ function loadStreamsFromStorage() {
 }
 
 function saveGlobalSettings() {
-    try {
-        localStorage.setItem(LS_GLOBAL_SETTINGS_KEY, JSON.stringify(globalSettings));
-    } catch (e) {
-        console.error("Error saving global settings to localStorage:", e);
-    }
+    try { localStorage.setItem(LS_GLOBAL_SETTINGS_KEY, JSON.stringify(globalSettings)); }
+    catch (e) { console.error("Error saving global settings to localStorage:", e); }
 }
 
 function loadGlobalSettings() {
@@ -72,7 +66,6 @@ function loadGlobalSettings() {
     }
 }
 
-// Load initial data
 loadStreamsFromStorage();
 loadGlobalSettings();
 
@@ -98,9 +91,7 @@ function getYoutubeVideoId(url) {
             const pathParts = urlObj.pathname.substring(1).split(/[?&]/);
             videoId = pathParts[0];
         }
-    } catch (e) {
-        console.warn("Could not parse YouTube URL with 'new URL()', trying regex. URL:", url, e);
-    }
+    } catch (e) { console.warn("Could not parse YouTube URL with 'new URL()', trying regex. URL:", url, e); }
     if (!videoId || videoId.length !== 11) {
         const regexes = [
             /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=))([^"&?\/\s]{11})/,
@@ -108,15 +99,11 @@ function getYoutubeVideoId(url) {
         ];
         for (const regex of regexes) {
             const match = url.match(regex);
-            if (match && match[1] && match[1].length === 11) {
-                videoId = match[1];
-                break;
-            }
+            if (match && match[1] && match[1].length === 11) { videoId = match[1]; break; }
         }
     }
     if (videoId && !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
-        console.warn("[YT Log] Extracted videoId might be invalid:", videoId, "from URL:", url);
-        return null;
+        console.warn("[YT Log] Extracted videoId might be invalid:", videoId, "from URL:", url); return null;
     }
     console.log("[YT Log] Extracted Video ID:", videoId);
     return videoId;
@@ -126,52 +113,52 @@ function createYouTubePlayer(playerId, videoId, wrapperId) {
     console.log(`[YT Log] createYouTubePlayer called. PlayerID: ${playerId}, VideoID: ${videoId}, WrapperID: ${wrapperId}`);
     const player = new YT.Player(playerId, {
         height: '100%', width: '100%', videoId: videoId,
-        playerVars: { 'autoplay': 1, 'controls': 1, 'mute': 1, 'playsinline': 1 },
+        playerVars: { 'autoplay': 1, 'controls': 1, 'mute': 1, 'playsinline': 1, 'cc_load_policy': 0 },
         events: {
             'onReady': (event) => {
                 console.log("[YT Log] YouTube Player onReady event. PlayerID:", playerId);
                 event.target.mute();
                 event.target.playVideo();
                 playerInstances[playerId] = { type: 'youtube', player: event.target, wrapperId: wrapperId, url: `https://www.youtube.com/watch?v=${videoId}` };
-                // applySubtitleSettingToYouTubePlayer if available and enabled
+                if (playerInstances[playerId]) {
+                    applySubtitleSettingToYouTubePlayer(playerInstances[playerId], globalSettings.enableSubtitles);
+                }
             },
-            'onStateChange': (event) => { /* console.log("[YT Log] YouTube Player onStateChange..."); */ },
-            'onError': (event) => { /* ... error handling ... */ }
+            'onStateChange': (event) => { console.log(`[YT Log] YT StateChange: ${playerId}, Data: ${event.data}`); },
+            'onError': (event) => {
+                console.error(`[YT Log] YT Error: ${event.data} for ${playerId}`);
+                const wrapper = document.getElementById(wrapperId);
+                if (wrapper) wrapper.innerHTML = `<p style="color:red; padding:10px;">YouTube Error: ${event.data}</p>`;
+            }
         }
     });
 }
 
 // --- Stream CRUD ---
 function addStream(newStream) {
-    if (!newStream || !newStream.name || !newStream.url || !newStream.type) return false;
-    if (newStream.type !== 'hls' && newStream.type !== 'youtube') return false;
+    if (!newStream || !newStream.name || !newStream.url || !newStream.type) { console.error("Invalid stream obj for addStream", newStream); return false; }
+    if (newStream.type !== 'hls' && newStream.type !== 'youtube') { console.error("Invalid stream type for addStream", newStream.type); return false;}
     if (!newStream.id) newStream.id = `stream-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
     if (typeof newStream.isDefault === 'undefined') newStream.isDefault = false;
     streams.push(newStream);
-    saveStreamsToStorage();
-    populateStreamDropdown();
+    saveStreamsToStorage(); populateStreamDropdown();
     return true;
 }
-
 function updateStream(index, updatedStream) {
     if (index < 0 || index >= streams.length || !updatedStream || !updatedStream.name || !updatedStream.url || !updatedStream.type) return false;
     if (updatedStream.type !== 'hls' && updatedStream.type !== 'youtube') return false;
     updatedStream.id = streams[index].id;
     updatedStream.isDefault = typeof updatedStream.isDefault !== 'undefined' ? updatedStream.isDefault : streams[index].isDefault;
     streams[index] = updatedStream;
-    saveStreamsToStorage();
-    populateStreamDropdown();
+    saveStreamsToStorage(); populateStreamDropdown();
     return true;
 }
-
 function deleteStream(index) {
     if (index < 0 || index >= streams.length) return false;
     streams.splice(index, 1);
-    saveStreamsToStorage();
-    populateStreamDropdown();
+    saveStreamsToStorage(); populateStreamDropdown();
     return true;
 }
-
 function setStreamDefaultStatus(streamId, isDefault) {
     const streamIndex = streams.findIndex(s => s.id === streamId);
     if (streamIndex === -1) return false;
@@ -181,25 +168,18 @@ function setStreamDefaultStatus(streamId, isDefault) {
 }
 
 // --- Player Abstraction & Subtitle Logic ---
-function mutePlayer(playerInstanceId) { /* ... (bereits implementiert) ... */ }
-function unmutePlayer(playerInstanceId) { /* ... (bereits implementiert) ... */ }
-function isPlayerMuted(playerInstanceId) { /* ... (bereits implementiert) ... */ }
-
-// (Die Implementierungen für mutePlayer, unmutePlayer, isPlayerMuted werden hier vollständig eingefügt)
 function mutePlayer(playerInstanceId) {
     const instance = playerInstances[playerInstanceId];
     if (!instance) return;
     if (instance.type === 'hls' && instance.media) instance.media.muted = true;
     else if (instance.type === 'youtube' && instance.player && typeof instance.player.mute === 'function') instance.player.mute();
 }
-
 function unmutePlayer(playerInstanceId) {
     const instance = playerInstances[playerInstanceId];
     if (!instance) return;
     if (instance.type === 'hls' && instance.media) instance.media.muted = false;
     else if (instance.type === 'youtube' && instance.player && typeof instance.player.unMute === 'function') instance.player.unMute();
 }
-
 function isPlayerMuted(playerInstanceId) {
     const instance = playerInstances[playerInstanceId];
     if (!instance) return true;
@@ -207,25 +187,75 @@ function isPlayerMuted(playerInstanceId) {
     else if (instance.type === 'youtube' && instance.player && typeof instance.player.isMuted === 'function') return instance.player.isMuted();
     return true;
 }
-
-
 function applySubtitleSettingToHlsPlayer(hlsInstanceContainer, enable) {
     if (hlsInstanceContainer && hlsInstanceContainer.hls) {
         const hls = hlsInstanceContainer.hls;
         if (enable) {
             if (hls.subtitleTracks && hls.subtitleTracks.length > 0) {
                 hls.subtitleTrack = 0;
-                console.log(`[Subtitles] HLS: Attempting to enable subtitles, track 0 for ${hlsInstanceContainer.wrapperId}`);
+                console.log(`[Subtitles] HLS: Enabled subtitles, track 0 for ${hlsInstanceContainer.wrapperId}`);
             } else {
-                console.log(`[Subtitles] HLS: Subtitles enabled globally, but no tracks found for ${hlsInstanceContainer.wrapperId}`);
                 hls.subtitleTrack = -1;
+                console.log(`[Subtitles] HLS: Subtitles globally ON, but no tracks for ${hlsInstanceContainer.wrapperId}`);
             }
         } else {
             hls.subtitleTrack = -1;
             console.log(`[Subtitles] HLS: Disabled subtitles for ${hlsInstanceContainer.wrapperId}`);
         }
+    }
+}
+
+function applySubtitleSettingToYouTubePlayer(ytInstanceContainer, enable) {
+    if (ytInstanceContainer && ytInstanceContainer.player && typeof ytInstanceContainer.player.loadModule === 'function') {
+        const player = ytInstanceContainer.player;
+        const internalPlayerId = Object.keys(playerInstances).find(key => playerInstances[key] === ytInstanceContainer);
+
+        try {
+            player.loadModule('captions');
+        } catch (e) {
+            console.warn(`[Subtitles] YT: Error loading captions module for ${internalPlayerId}. May already be loaded or API issue.`, e.message);
+        }
+
+        if (enable) {
+            setTimeout(() => {
+                try {
+                    if (!player || typeof player.getOption !== 'function' || typeof player.setOption !== 'function') {
+                        console.warn(`[Subtitles] YT: Player object or methods not available for ${internalPlayerId} when trying to enable subtitles.`);
+                        return;
+                    }
+                    const tracklist = player.getOption('captions', 'tracklist');
+                    if (tracklist && tracklist.length > 0) {
+                        let targetTrack = tracklist[0];
+                        const preferredLangs = ['en', 'de'];
+                        for (const track of tracklist) {
+                            if (preferredLangs.includes(track.languageCode)) {
+                                targetTrack = track; break;
+                            }
+                        }
+                        player.setOption('captions', 'track', { 'languageCode': targetTrack.languageCode });
+                        console.log(`[Subtitles] YT: Enabled subtitles, lang '${targetTrack.languageName || targetTrack.languageCode}' for ${internalPlayerId}`);
+                    } else {
+                        console.log(`[Subtitles] YT: Subtitles enabled globally, but no tracks found for ${internalPlayerId}`);
+                        player.setOption('captions', 'track', {});
+                    }
+                } catch (e) {
+                    console.error(`[Subtitles] YT: Error enabling/setting subtitles for ${internalPlayerId}:`, e);
+                }
+            }, 750);
+        } else {
+            try {
+                 if (!player || typeof player.setOption !== 'function') {
+                    console.warn(`[Subtitles] YT: Player object or setOption not available for ${internalPlayerId} when trying to disable subtitles.`);
+                    return;
+                }
+                player.setOption('captions', 'track', {});
+                console.log(`[Subtitles] YT: Disabled subtitles for ${internalPlayerId}`);
+            } catch (e) {
+                console.error(`[Subtitles] YT: Error disabling subtitles for ${internalPlayerId}:`, e);
+            }
+        }
     } else {
-        console.warn("[Subtitles] HLS: applySubtitleSettingToHlsPlayer called with invalid instance container:", hlsInstanceContainer);
+        console.warn("[Subtitles] YT: applySubtitleSettingToYouTubePlayer called with invalid instance container:", ytInstanceContainer);
     }
 }
 
@@ -236,7 +266,7 @@ function applySubtitleSettingsToAllPlayers() {
         if (instance.type === 'hls') {
             applySubtitleSettingToHlsPlayer(instance, globalSettings.enableSubtitles);
         } else if (instance.type === 'youtube') {
-            console.log("[Subtitles] YouTube subtitle logic pending for player:", playerId);
+            applySubtitleSettingToYouTubePlayer(instance, globalSettings.enableSubtitles);
         }
     }
 }
@@ -251,13 +281,11 @@ function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId) {
     if (streamType === 'hls') {
         if (!Hls.isSupported()) {
             videoWrapper.innerHTML = `<p style="color:red; padding:10px;">HLS.js not supported.</p>`;
-            if (videoGridContainer) videoGridContainer.appendChild(videoWrapper);
-            return;
+            if (videoGridContainer) videoGridContainer.appendChild(videoWrapper); return;
         }
         const videoElement = document.createElement('video');
         videoElement.id = playerInstanceId;
         videoElement.muted = true; videoElement.autoplay = true; videoElement.playsInline = true;
-
         const hls = new Hls({
             startLevel: -1, capLevelToPlayerSize: true, maxBufferSize: 30, maxBufferLength: 10,
             liveSyncDurationCount: 3, liveMaxLatencyDurationCount: 5,
@@ -266,18 +294,16 @@ function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId) {
         hls.attachMedia(videoElement);
         playerInstances[playerInstanceId] = { type: 'hls', hls: hls, media: videoElement, wrapperId: playerWrapperId, url: streamUrl };
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            videoElement.play().catch(e => console.warn("HLS Play prevented:", e));
-            // Apply subtitle settings (this is the part being modified in the next step)
+        const hlsPlayerReadyAndSubtitlesHandler = () => {
             if (playerInstances[playerInstanceId]) {
-                 applySubtitleSettingToHlsPlayer(playerInstances[playerInstanceId], globalSettings.enableSubtitles);
-            }
-        });
-        hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
-             if (playerInstances[playerInstanceId]) {
                 applySubtitleSettingToHlsPlayer(playerInstances[playerInstanceId], globalSettings.enableSubtitles);
             }
+        };
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            videoElement.play().catch(e => console.warn("HLS Play prevented:", e));
+            hlsPlayerReadyAndSubtitlesHandler();
         });
+        hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, hlsPlayerReadyAndSubtitlesHandler);
         hls.on(Hls.Events.ERROR, (event, data) => {
             console.error('HLS.js error:', data.type, data.details, data.fatal);
             if (data.fatal) {
@@ -289,33 +315,24 @@ function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId) {
             }
         });
         videoWrapper.appendChild(videoElement);
-
     } else if (streamType === 'youtube') {
         console.log("[YT Log] addStreamToGrid for YouTube. URL:", streamUrl, "PlayerID:", playerInstanceId);
         const videoId = getYoutubeVideoId(streamUrl);
         if (!videoId) {
             videoWrapper.innerHTML = `<p style="color:red; padding:10px;">Invalid YouTube URL: ${streamName}</p>`;
-            if (videoGridContainer) videoGridContainer.appendChild(videoWrapper);
-            return;
+            if (videoGridContainer) videoGridContainer.appendChild(videoWrapper); return;
         }
         const youtubePlayerDiv = document.createElement('div');
         youtubePlayerDiv.id = playerInstanceId;
         videoWrapper.appendChild(youtubePlayerDiv);
-
-        if (youtubeApiReady) {
-            createYouTubePlayer(playerInstanceId, videoId, playerWrapperId);
-        } else {
-            youtubePlayerQueue.push({ playerId: playerInstanceId, videoId: videoId, playerWrapperId: playerWrapperId });
-        }
+        if (youtubeApiReady) createYouTubePlayer(playerInstanceId, videoId, playerWrapperId);
+        else youtubePlayerQueue.push({ playerId: playerInstanceId, videoId: videoId, playerWrapperId: playerWrapperId });
     }
 
-    const removeBtn = document.createElement('button'); /* ... */
-    removeBtn.classList.add('remove-stream-btn');
-    removeBtn.innerHTML = '&times;';
+    const removeBtn = document.createElement('button');
+    removeBtn.classList.add('remove-stream-btn'); removeBtn.innerHTML = '&times;';
     removeBtn.title = `Stream "${streamName}" entfernen`;
-    removeBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); removeStreamFromGrid(playerInstanceId);
-    });
+    removeBtn.addEventListener('click', (e) => { e.stopPropagation(); removeStreamFromGrid(playerInstanceId); });
     videoWrapper.appendChild(removeBtn);
     if (videoGridContainer) videoGridContainer.appendChild(videoWrapper);
 
@@ -331,20 +348,23 @@ function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId) {
     updateGridLayout();
 }
 
-
-function getCurrentFullscreenElement() { /* ... (bereits implementiert) ... */ }
-function handleVideoWrapperClick(event, videoElement, activePlayerId) { /* ... (bereits implementiert) ... */ }
-function handleVideoWrapperDblClick(event, videoElement, activePlayerId) { /* ... (bereits implementiert) ... */ }
-function handleFullscreenChange() { /* ... (bereits implementiert) ... */ }
-function updateGridLayout() { /* ... (bereits implementiert) ... */ }
-function updateAudioActiveFrame(activePlayerWrapperId) { /* ... (bereits implementiert) ... */ }
-
-// (Vollständige Implementierungen für die oben als /* ... */ markierten Funktionen hier einfügen)
-// getCurrentFullscreenElement
-function getCurrentFullscreenElement() {
-    return document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+function removeStreamFromGrid(playerInstanceId) {
+    const instanceInfo = playerInstances[playerInstanceId];
+    if (!instanceInfo) return;
+    const videoWrapper = document.getElementById(instanceInfo.wrapperId);
+    if (videoWrapper && videoWrapper.parentNode === videoGridContainer) videoGridContainer.removeChild(videoWrapper);
+    const instance = playerInstances[playerInstanceId];
+    if (instance) {
+        if (instance.type === 'hls' && instance.hls) instance.hls.destroy();
+        else if (instance.type === 'youtube' && instance.player && typeof instance.player.destroy === 'function') instance.player.destroy();
+        delete playerInstances[playerInstanceId];
+    }
+    if (videoWrapper && videoWrapper.classList.contains('audio-active')) updateAudioActiveFrame(null);
+    updateGridLayout();
 }
-// handleVideoWrapperClick
+
+function getCurrentFullscreenElement() { return document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement; }
+
 function handleVideoWrapperClick(event, videoElement, activePlayerId) {
     const currentFullscreenElement = getCurrentFullscreenElement();
     const instance = playerInstances[activePlayerId];
@@ -369,7 +389,7 @@ function handleVideoWrapperClick(event, videoElement, activePlayerId) {
         }
     }
 }
-// handleVideoWrapperDblClick
+
 function handleVideoWrapperDblClick(event, videoElement, activePlayerId) {
     const currentFullscreenElement = getCurrentFullscreenElement();
     const instance = playerInstances[activePlayerId];
@@ -401,14 +421,14 @@ function handleVideoWrapperDblClick(event, videoElement, activePlayerId) {
         }
     }
 }
-// handleFullscreenChange
+
 function handleFullscreenChange() {
     if (!getCurrentFullscreenElement()) {
         for (const id in playerInstances) mutePlayer(id);
         updateAudioActiveFrame(null);
     }
 }
-// updateGridLayout
+
 function updateGridLayout() {
     if (!videoGridContainer) return;
     const numVideos = videoGridContainer.children.length;
@@ -424,14 +444,14 @@ function updateGridLayout() {
         videoGridContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     }
 }
-// updateAudioActiveFrame
+
 function updateAudioActiveFrame(activePlayerWrapperId) {
     document.querySelectorAll('.video-player-wrapper').forEach(wrapper => {
         if (wrapper.id === activePlayerWrapperId) wrapper.classList.add('audio-active');
         else wrapper.classList.remove('audio-active');
     });
 }
-// populateStreamDropdown (vollständig)
+
 function populateStreamDropdown() {
     if (!streamSelect || !streams) return;
     const currentSelectedIndex = streamSelect.value;
@@ -448,7 +468,6 @@ function populateStreamDropdown() {
         streamSelect.value = "";
     }
 }
-
 
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -486,7 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const headerTriggerZone = document.getElementById('header-trigger-zone');
     let headerVisibilityTimer = null;
     const HEADER_VISIBILITY_DELAY = 100;
-    if (header && headerTriggerZone) { /* ... header visibility logic ... */
+    if (header && headerTriggerZone) {
         headerTriggerZone.addEventListener('mouseenter', () => {
             clearTimeout(headerVisibilityTimer);
             headerVisibilityTimer = setTimeout(() => header.classList.add('header-visible'), HEADER_VISIBILITY_DELAY);
@@ -506,8 +525,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalStreamListContainer = document.getElementById('modal-stream-list-container');
     const modalCloseBtn = streamManagerModal ? streamManagerModal.querySelector('.modal-close-btn') : null;
 
-    function renderStreamManagementList() { /* ... (bereits implementiert) ... */ }
-    // (Vollständige renderStreamManagementList hier einfügen)
     function renderStreamManagementList() {
         if (!modalStreamListContainer) return;
         modalStreamListContainer.innerHTML = '';
@@ -531,7 +548,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-
     if (manageStreamsBtn && streamManagerModal && modalCloseBtn && modalStreamListContainer) {
         manageStreamsBtn.addEventListener('click', () => {
             renderStreamManagementList();
@@ -547,14 +563,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (event.target === streamManagerModal) streamManagerModal.classList.remove('modal-open');
         });
         modalStreamListContainer.addEventListener('click', (event) => {
-            if (event.target.classList.contains('delete-stream-btn')) { /* ... delete logic ... */
+            if (event.target.classList.contains('delete-stream-btn')) {
                 const streamIndex = parseInt(event.target.dataset.index, 10);
                 if (!isNaN(streamIndex) && streams[streamIndex] && confirm(`Stream "${streams[streamIndex].name}" wirklich löschen?`)) {
                     deleteStream(streamIndex); renderStreamManagementList();
                 }
-            } else if (event.target.classList.contains('default-stream-checkbox')) { /* ... default toggle logic ... */
+            } else if (event.target.classList.contains('default-stream-checkbox')) {
                 setStreamDefaultStatus(event.target.dataset.streamId, event.target.checked);
-            } else if (event.target.classList.contains('edit-stream-btn')) { /* ... edit form prep logic ... */
+            } else if (event.target.classList.contains('edit-stream-btn')) {
                 const streamIndex = parseInt(event.target.dataset.index, 10);
                 const streamToEdit = streams[streamIndex];
                 if (streamToEdit) {
@@ -572,7 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const streamForm = document.getElementById('stream-form');
         const cancelEditBtn = document.getElementById('cancel-edit-btn');
-        if (streamForm && cancelEditBtn) { /* ... form submit and cancel logic ... */
+        if (streamForm && cancelEditBtn) {
             streamForm.addEventListener('submit', (event) => {
                 event.preventDefault();
                 const streamIdToEdit = document.getElementById('stream-edit-id').value;
