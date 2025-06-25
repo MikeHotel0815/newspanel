@@ -6,6 +6,7 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    overflow: hidden; /* Prevent body scrollbars when grid fits */
 }
 
 /* Header Trigger Zone Styling */
@@ -82,15 +83,19 @@ header h1 {
 main {
     flex-grow: 1;
     padding: 1rem;
+    padding-top: 100px; /* Approximate header height, adjust if necessary */
+    display: flex; /* Allow video-grid-container to flex-grow */
+    flex-direction: column; /* Stack children vertically */
+    overflow: hidden; /* Prevent scrollbars on main if grid fits perfectly */
 }
 
 #video-grid-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Standard-Grid, wird ggf. durch JS angepasst */
+    /* grid-template-columns are set by JS */
     gap: 10px;
     width: 100%;
-    height: calc(100vh - 150px); /* Beispielhöhe, anpassen nach Bedarf */
-    overflow-y: auto; /* Falls mehr Videos als Platz */
+    flex-grow: 1; /* Takes available vertical space in main */
+    /* overflow-y: auto; */ /* Removed to prevent internal scrollbars */
 }
 
 .video-player-wrapper {

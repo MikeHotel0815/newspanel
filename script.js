@@ -435,16 +435,32 @@ function updateGridLayout() {
     if (!videoGridContainer) return;
     const numVideos = videoGridContainer.children.length;
     const isPortrait = window.innerHeight > window.innerWidth;
-    if (numVideos === 0) { videoGridContainer.style.gridTemplateColumns = 'none'; return; }
-    if (isPortrait) { videoGridContainer.style.gridTemplateColumns = '1fr'; }
-    else {
-        let cols;
+
+    if (numVideos === 0) {
+        videoGridContainer.style.gridTemplateColumns = 'none';
+        videoGridContainer.style.gridTemplateRows = 'none';
+        return;
+    }
+
+    let cols;
+    if (isPortrait) {
+        cols = 1;
+    } else {
         if (numVideos === 1) cols = 1;
         else if (numVideos <= 4) cols = 2;
-        else if (numVideos <= 9) cols = 3;
-        else cols = 4;
-        videoGridContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        else if (numVideos <= 6) cols = 3; // Adjusted for better aspect ratios generally
+        else if (numVideos <= 8) cols = 4; // Adjusted
+        else if (numVideos <= 12) cols = 4; // Keep 4 columns for more videos, rows will increase
+        else cols = Math.ceil(Math.sqrt(numVideos)); // Fallback for many videos
     }
+
+    // Ensure cols is at least 1
+    cols = Math.max(1, cols);
+
+    const rows = Math.ceil(numVideos / cols);
+
+    videoGridContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    videoGridContainer.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 }
 
 function updateAudioActiveFrame(activePlayerWrapperId) {
