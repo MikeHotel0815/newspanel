@@ -248,12 +248,25 @@ function handleVideoWrapperClick(event, videoElement, activePlayerId) {
             else instance.player.mute();
         }
     } else if (!currentFullscreenElement) {
+        // Click in Grid view
         event.preventDefault();
-        for (const id in playerInstances) {
-            if (id === activePlayerId) unmutePlayer(id);
-            else mutePlayer(id);
+        const wasMuted = isPlayerMuted(activePlayerId);
+
+        if (wasMuted) {
+            // Was muted, so unmute this one and mute others
+            for (const id in playerInstances) {
+                if (id === activePlayerId) {
+                    unmutePlayer(id);
+                } else {
+                    mutePlayer(id);
+                }
+            }
+            updateAudioActiveFrame(instance.wrapperId);
+        } else {
+            // Was unmuted, so mute this one
+            mutePlayer(activePlayerId);
+            updateAudioActiveFrame(null); // No stream has active audio now
         }
-        updateAudioActiveFrame(instance.wrapperId);
     }
 }
 
@@ -350,6 +363,18 @@ function unmutePlayer(playerInstanceId) {
     if (!instance) return;
     if (instance.type === 'hls' && instance.media) instance.media.muted = false;
     else if (instance.type === 'youtube' && instance.player && typeof instance.player.unMute === 'function') instance.player.unMute();
+}
+
+function isPlayerMuted(playerInstanceId) {
+    const instance = playerInstances[playerInstanceId];
+    if (!instance) return true; // Default to muted if instance not found
+
+    if (instance.type === 'hls' && instance.media) {
+        return instance.media.muted;
+    } else if (instance.type === 'youtube' && instance.player && typeof instance.player.isMuted === 'function') {
+        return instance.player.isMuted();
+    }
+    return true; // Default to muted if type is unknown or player/media missing
 }
 
 // --- DOMContentLoaded ---
