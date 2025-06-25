@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (event.target === removeBtn) {
                 return;
             }
-            handleVideoWrapperClick(videoElement, playerInstanceId);
+            handleVideoWrapperClick(event, videoElement, playerInstanceId); // Pass event object
         });
 
         videoWrapper.addEventListener('dblclick', (event) => {
@@ -143,15 +143,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
     }
 
-    function handleVideoWrapperClick(videoElement, activePlayerId) {
+    function handleVideoWrapperClick(event, videoElement, activePlayerId) { // Added event parameter
         const currentFullscreenElement = getCurrentFullscreenElement();
 
         if (currentFullscreenElement === videoElement) {
-            // Video is already in fullscreen: toggle sound
+            // Video is already in fullscreen: toggle sound and prevent default browser action (play/pause)
+            event.preventDefault(); // Prevent browser's default click action on video
             videoElement.muted = !videoElement.muted;
         } else if (!currentFullscreenElement) {
             // No video is in fullscreen: enter fullscreen for this video
             // Unmute this video, mute others
+            // event.preventDefault() might be needed here too if clicking the wrapper around a video
+            // that is not yet fullscreen also triggers some unwanted default action. For now, assume not.
             document.querySelectorAll('#video-grid-container video').forEach(vid => {
                 const parentWrapper = vid.closest('.video-player-wrapper');
                 if (parentWrapper && parentWrapper.id === activePlayerId) {
