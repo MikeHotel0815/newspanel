@@ -77,13 +77,20 @@ main {
     text-align: center;
     cursor: pointer;
     z-index: 10;
-    opacity: 0.7;
-    transition: opacity 0.3s ease;
+    opacity: 0; /* Standardmäßig unsichtbar */
+    visibility: hidden; /* Standardmäßig nicht im Layout und nicht klickbar */
+    transition: opacity 0.3s ease, visibility 0s ease 0.3s; /* Visibility verzögert ändern */
+}
+
+.video-player-wrapper:hover .remove-stream-btn {
+    opacity: 0.7; /* Sichtbar beim Hovern über den Wrapper */
+    visibility: visible;
+    transition-delay: 0s; /* Keine Verzögerung für Visibility beim Sichtbarwerden */
 }
 
 .remove-stream-btn:hover {
     background-color: rgba(255, 0, 0, 1);
-    opacity: 1;
+    opacity: 1; /* Volle Opazität beim direkten Hovern über den Button */
 }
 
 /* Vollbild-Styling */
