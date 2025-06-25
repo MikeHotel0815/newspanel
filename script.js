@@ -1,4 +1,4 @@
-// --- Global Variables and Helper Functions ---
+// --- Global Constants & Variables ---
 const LS_STREAMS_KEY = 'hlsAppUserStreams';
 const LS_GLOBAL_SETTINGS_KEY = 'hlsAppGlobalSettings';
 
@@ -19,8 +19,19 @@ const defaultInitialStreams = [
     { id: 'default-yt-ed', name: "Elephants Dream (YouTube)", type: "youtube", url: "https://www.youtube.com/watch?v=M7lc1UVf-VE", isDefault: false }
 ];
 
+// DOM Elements (will be initialized in DOMContentLoaded)
 let streamSelect;
 let videoGridContainer;
+let header; // For header hide/show logic
+let headerTriggerZone; // For header hide/show logic
+let manageStreamsBtn;
+let streamManagerModal;
+let modalStreamListContainer;
+let modalCloseBtn;
+let globalEnableSubtitlesCheckbox;
+let streamForm;
+let cancelEditBtn;
+
 
 // --- Storage Functions ---
 function saveStreamsToStorage() {
@@ -59,13 +70,15 @@ function loadGlobalSettings() {
             const parsedSettings = JSON.parse(storedSettings);
             globalSettings = { ...globalSettings, ...parsedSettings };
         } else {
-            saveGlobalSettings();
+            saveGlobalSettings(); // Save defaults if nothing is stored
         }
     } catch (e) {
         console.error("Error loading global settings from localStorage, using defaults:", e);
+        // globalSettings remains as pre-defined defaults
     }
 }
 
+// Load initial data at script start
 loadStreamsFromStorage();
 loadGlobalSettings();
 
@@ -123,6 +136,7 @@ function createYouTubePlayer(playerId, videoId, wrapperId) {
                 if (playerInstances[playerId]) {
                     applySubtitleSettingToYouTubePlayer(playerInstances[playerId], globalSettings.enableSubtitles);
                 }
+                console.log("[YT Log] YouTube Player instance stored:", playerInstances[playerId]);
             },
             'onStateChange': (event) => { console.log(`[YT Log] YT StateChange: ${playerId}, Data: ${event.data}`); },
             'onError': (event) => {
@@ -141,29 +155,30 @@ function addStream(newStream) {
     if (!newStream.id) newStream.id = `stream-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
     if (typeof newStream.isDefault === 'undefined') newStream.isDefault = false;
     streams.push(newStream);
-    saveStreamsToStorage(); populateStreamDropdown();
+    saveStreamsToStorage(); populateStreamDropdown(); console.log("Stream added:", newStream);
     return true;
 }
 function updateStream(index, updatedStream) {
-    if (index < 0 || index >= streams.length || !updatedStream || !updatedStream.name || !updatedStream.url || !updatedStream.type) return false;
-    if (updatedStream.type !== 'hls' && updatedStream.type !== 'youtube') return false;
+    if (index < 0 || index >= streams.length || !updatedStream || !updatedStream.name || !updatedStream.url || !updatedStream.type) { console.error("Invalid data for updateStream"); return false; }
+    if (updatedStream.type !== 'hls' && updatedStream.type !== 'youtube') { console.error("Invalid stream type for updateStream"); return false; }
     updatedStream.id = streams[index].id;
     updatedStream.isDefault = typeof updatedStream.isDefault !== 'undefined' ? updatedStream.isDefault : streams[index].isDefault;
     streams[index] = updatedStream;
-    saveStreamsToStorage(); populateStreamDropdown();
+    saveStreamsToStorage(); populateStreamDropdown(); console.log("Stream updated at index:", index);
     return true;
 }
 function deleteStream(index) {
-    if (index < 0 || index >= streams.length) return false;
+    if (index < 0 || index >= streams.length) { console.error("Invalid index for deleteStream"); return false; }
+    const removedStreamName = streams[index].name;
     streams.splice(index, 1);
-    saveStreamsToStorage(); populateStreamDropdown();
+    saveStreamsToStorage(); populateStreamDropdown(); console.log("Stream removed:", removedStreamName);
     return true;
 }
 function setStreamDefaultStatus(streamId, isDefault) {
     const streamIndex = streams.findIndex(s => s.id === streamId);
-    if (streamIndex === -1) return false;
+    if (streamIndex === -1) { console.error("Stream not found for setDefaultStatus, ID:", streamId); return false; }
     streams[streamIndex].isDefault = !!isDefault;
-    saveStreamsToStorage();
+    saveStreamsToStorage(); console.log(`Stream ID ${streamId} isDefault set to ${streams[streamIndex].isDefault}`);
     return true;
 }
 
@@ -190,6 +205,14 @@ function isPlayerMuted(playerInstanceId) {
 function applySubtitleSettingToHlsPlayer(hlsInstanceContainer, enable) {
     if (hlsInstanceContainer && hlsInstanceContainer.hls) {
         const hls = hlsInstanceContainer.hls;
+        // Wait for subtitle tracks to be loaded if not already
+        if (!hls.subtitleTracks || hls.subtitleTracks.length === 0 && hls.levels && hls.levels.length > 0) {
+             // If manifest is loaded but tracks aren't there yet, wait for SUBTITLE_TRACK_LOADED or SUBTITLE_TRACKS_UPDATED
+            console.log(`[Subtitles] HLS: Waiting for subtitle tracks for ${hlsInstanceContainer.wrapperId}`);
+            // The actual setting will be applied by the event listener for SUBTITLE_TRACKS_UPDATED
+            return;
+        }
+
         if (enable) {
             if (hls.subtitleTracks && hls.subtitleTracks.length > 0) {
                 hls.subtitleTrack = 0;
@@ -204,70 +227,49 @@ function applySubtitleSettingToHlsPlayer(hlsInstanceContainer, enable) {
         }
     }
 }
-
 function applySubtitleSettingToYouTubePlayer(ytInstanceContainer, enable) {
     if (ytInstanceContainer && ytInstanceContainer.player && typeof ytInstanceContainer.player.loadModule === 'function') {
         const player = ytInstanceContainer.player;
         const internalPlayerId = Object.keys(playerInstances).find(key => playerInstances[key] === ytInstanceContainer);
-
-        try {
-            player.loadModule('captions');
-        } catch (e) {
-            console.warn(`[Subtitles] YT: Error loading captions module for ${internalPlayerId}. May already be loaded or API issue.`, e.message);
-        }
+        try { player.loadModule('captions'); }
+        catch (e) { console.warn(`[Subtitles] YT: Error loading captions module for ${internalPlayerId}. May already be loaded.`, e.message); }
 
         if (enable) {
             setTimeout(() => {
                 try {
                     if (!player || typeof player.getOption !== 'function' || typeof player.setOption !== 'function') {
-                        console.warn(`[Subtitles] YT: Player object or methods not available for ${internalPlayerId} when trying to enable subtitles.`);
-                        return;
+                        console.warn(`[Subtitles] YT: Player methods not available for ${internalPlayerId} (enable).`); return;
                     }
                     const tracklist = player.getOption('captions', 'tracklist');
                     if (tracklist && tracklist.length > 0) {
                         let targetTrack = tracklist[0];
                         const preferredLangs = ['en', 'de'];
-                        for (const track of tracklist) {
-                            if (preferredLangs.includes(track.languageCode)) {
-                                targetTrack = track; break;
-                            }
-                        }
+                        for (const track of tracklist) { if (preferredLangs.includes(track.languageCode)) { targetTrack = track; break; } }
                         player.setOption('captions', 'track', { 'languageCode': targetTrack.languageCode });
                         console.log(`[Subtitles] YT: Enabled subtitles, lang '${targetTrack.languageName || targetTrack.languageCode}' for ${internalPlayerId}`);
                     } else {
-                        console.log(`[Subtitles] YT: Subtitles enabled globally, but no tracks found for ${internalPlayerId}`);
+                        console.log(`[Subtitles] YT: Subtitles globally ON, but no tracks for ${internalPlayerId}`);
                         player.setOption('captions', 'track', {});
                     }
-                } catch (e) {
-                    console.error(`[Subtitles] YT: Error enabling/setting subtitles for ${internalPlayerId}:`, e);
-                }
+                } catch (e) { console.error(`[Subtitles] YT: Error enabling subtitles for ${internalPlayerId}:`, e); }
             }, 750);
         } else {
             try {
                  if (!player || typeof player.setOption !== 'function') {
-                    console.warn(`[Subtitles] YT: Player object or setOption not available for ${internalPlayerId} when trying to disable subtitles.`);
-                    return;
-                }
+                     console.warn(`[Subtitles] YT: Player methods not available for ${internalPlayerId} (disable).`); return;
+                 }
                 player.setOption('captions', 'track', {});
                 console.log(`[Subtitles] YT: Disabled subtitles for ${internalPlayerId}`);
-            } catch (e) {
-                console.error(`[Subtitles] YT: Error disabling subtitles for ${internalPlayerId}:`, e);
-            }
+            } catch (e) { console.error(`[Subtitles] YT: Error disabling subtitles for ${internalPlayerId}:`, e); }
         }
-    } else {
-        console.warn("[Subtitles] YT: applySubtitleSettingToYouTubePlayer called with invalid instance container:", ytInstanceContainer);
     }
 }
-
 function applySubtitleSettingsToAllPlayers() {
     console.log("[Subtitles] Applying global subtitle setting to all players. Enabled:", globalSettings.enableSubtitles);
     for (const playerId in playerInstances) {
         const instance = playerInstances[playerId];
-        if (instance.type === 'hls') {
-            applySubtitleSettingToHlsPlayer(instance, globalSettings.enableSubtitles);
-        } else if (instance.type === 'youtube') {
-            applySubtitleSettingToYouTubePlayer(instance, globalSettings.enableSubtitles);
-        }
+        if (instance.type === 'hls') applySubtitleSettingToHlsPlayer(instance, globalSettings.enableSubtitles);
+        else if (instance.type === 'youtube') applySubtitleSettingToYouTubePlayer(instance, globalSettings.enableSubtitles);
     }
 }
 
@@ -446,6 +448,7 @@ function updateGridLayout() {
 }
 
 function updateAudioActiveFrame(activePlayerWrapperId) {
+    if (!document.querySelectorAll) return; // Guard for very old browsers or non-browser env
     document.querySelectorAll('.video-player-wrapper').forEach(wrapper => {
         if (wrapper.id === activePlayerWrapperId) wrapper.classList.add('audio-active');
         else wrapper.classList.remove('audio-active');
@@ -462,7 +465,7 @@ function populateStreamDropdown() {
         option.textContent = stream.name;
         streamSelect.appendChild(option);
     });
-    if (currentSelectedIndex !== "" && parseInt(currentSelectedIndex) < streams.length) {
+    if (currentSelectedIndex !== "" && parseInt(currentSelectedIndex) < streams.length && streams[parseInt(currentSelectedIndex)]) {
         streamSelect.value = currentSelectedIndex;
     } else {
         streamSelect.value = "";
@@ -473,7 +476,15 @@ function populateStreamDropdown() {
 document.addEventListener('DOMContentLoaded', () => {
     streamSelect = document.getElementById('stream-select');
     videoGridContainer = document.getElementById('video-grid-container');
-    const globalEnableSubtitlesCheckbox = document.getElementById('global-enable-subtitles');
+    header = document.querySelector('header');
+    headerTriggerZone = document.getElementById('header-trigger-zone');
+    manageStreamsBtn = document.getElementById('manage-streams-btn');
+    streamManagerModal = document.getElementById('stream-manager-modal');
+    modalStreamListContainer = document.getElementById('modal-stream-list-container');
+    modalCloseBtn = streamManagerModal ? streamManagerModal.querySelector('.modal-close-btn') : null;
+    globalEnableSubtitlesCheckbox = document.getElementById('global-enable-subtitles');
+    streamForm = document.getElementById('stream-form');
+    cancelEditBtn = document.getElementById('cancel-edit-btn');
 
     populateStreamDropdown();
 
@@ -501,8 +512,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateGridLayout();
     window.addEventListener('resize', updateGridLayout);
 
-    const header = document.querySelector('header');
-    const headerTriggerZone = document.getElementById('header-trigger-zone');
     let headerVisibilityTimer = null;
     const HEADER_VISIBILITY_DELAY = 100;
     if (header && headerTriggerZone) {
@@ -519,11 +528,6 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(headerVisibilityTimer); header.classList.remove('header-visible');
         });
     }
-
-    const manageStreamsBtn = document.getElementById('manage-streams-btn');
-    const streamManagerModal = document.getElementById('stream-manager-modal');
-    const modalStreamListContainer = document.getElementById('modal-stream-list-container');
-    const modalCloseBtn = streamManagerModal ? streamManagerModal.querySelector('.modal-close-btn') : null;
 
     function renderStreamManagementList() {
         if (!modalStreamListContainer) return;
@@ -551,11 +555,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (manageStreamsBtn && streamManagerModal && modalCloseBtn && modalStreamListContainer) {
         manageStreamsBtn.addEventListener('click', () => {
             renderStreamManagementList();
-            document.getElementById('stream-form').reset();
-            document.getElementById('stream-edit-id').value = '';
-            document.querySelector('#stream-edit-form-container h3').textContent = 'Stream hinzufügen';
-            document.getElementById('save-stream-btn').textContent = 'Hinzufügen';
-            document.getElementById('cancel-edit-btn').style.display = 'none';
+            if(streamForm) streamForm.reset(); // Check if streamForm exists
+            if(document.getElementById('stream-edit-id')) document.getElementById('stream-edit-id').value = '';
+            if(document.querySelector('#stream-edit-form-container h3')) document.querySelector('#stream-edit-form-container h3').textContent = 'Stream hinzufügen';
+            if(document.getElementById('save-stream-btn')) document.getElementById('save-stream-btn').textContent = 'Hinzufügen';
+            if(cancelEditBtn) cancelEditBtn.style.display = 'none'; // Check if cancelEditBtn exists
             streamManagerModal.classList.add('modal-open');
         });
         modalCloseBtn.addEventListener('click', () => streamManagerModal.classList.remove('modal-open'));
@@ -573,7 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (event.target.classList.contains('edit-stream-btn')) {
                 const streamIndex = parseInt(event.target.dataset.index, 10);
                 const streamToEdit = streams[streamIndex];
-                if (streamToEdit) {
+                if (streamToEdit && streamForm) { // Check streamForm
                     document.getElementById('stream-edit-form-container').querySelector('h3').textContent = 'Stream bearbeiten';
                     document.getElementById('stream-edit-id').value = streamToEdit.id;
                     document.getElementById('stream-name').value = streamToEdit.name;
@@ -581,13 +585,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('stream-type').value = streamToEdit.type;
                     document.getElementById('stream-is-default').checked = streamToEdit.isDefault;
                     document.getElementById('save-stream-btn').textContent = 'Änderungen speichern';
-                    document.getElementById('cancel-edit-btn').style.display = 'inline-block';
+                    if(cancelEditBtn) cancelEditBtn.style.display = 'inline-block';
                     document.getElementById('stream-name').focus();
                 }
             }
         });
-        const streamForm = document.getElementById('stream-form');
-        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+
         if (streamForm && cancelEditBtn) {
             streamForm.addEventListener('submit', (event) => {
                 event.preventDefault();
@@ -607,7 +610,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 streamForm.reset(); document.getElementById('stream-edit-id').value = '';
                 document.getElementById('stream-edit-form-container').querySelector('h3').textContent = 'Stream hinzufügen';
                 document.getElementById('save-stream-btn').textContent = 'Hinzufügen';
-                cancelEditBtn.style.display = 'none'; renderStreamManagementList();
+                if(cancelEditBtn) cancelEditBtn.style.display = 'none';
+                renderStreamManagementList();
             });
             cancelEditBtn.addEventListener('click', () => {
                 streamForm.reset(); document.getElementById('stream-edit-id').value = '';
