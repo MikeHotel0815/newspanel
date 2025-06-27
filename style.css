@@ -384,3 +384,25 @@ main {
     border: 3px dashed #007bff; /* Example: blue dashed border */
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
+
+.stream-name-overlay {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 0.9em;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0s ease 0.3s;
+    z-index: 11; /* Über dem Video, aber unter dem Entfernen-Button, falls dieser oben links wäre */
+    pointer-events: none; /* Damit Klicks durch das Overlay zum Video gelangen */
+}
+
+.video-player-wrapper:hover .stream-name-overlay {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+}

@@ -388,6 +388,12 @@ function addStreamToGrid(streamUrl, streamName, streamType, playerInstanceId, st
     videoWrapper.draggable = true; // Make the wrapper draggable
     videoWrapper.dataset.playerId = playerInstanceId; // Store player ID for drag identification
 
+    // Create and add stream name overlay
+    const streamNameOverlay = document.createElement('div');
+    streamNameOverlay.classList.add('stream-name-overlay');
+    streamNameOverlay.textContent = streamName;
+    videoWrapper.appendChild(streamNameOverlay);
+
     if (streamType === 'hls') {
         if (!Hls.isSupported()) {
             videoWrapper.innerHTML = `<p style="color:red; padding:10px;">HLS.js not supported.</p>`;
